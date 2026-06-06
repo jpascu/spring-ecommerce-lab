@@ -1,0 +1,16 @@
+spring:
+  application:
+    name: ecommerce-backend
+
+server:
+  port: 8080
+
+# Exponemos endpoints de Actuator para observabilidad (health, info, metrics)
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      show-details: always
