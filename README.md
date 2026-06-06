@@ -16,20 +16,29 @@ construido de forma incremental por fases. El dominio es una pequeña tienda / c
 | Testing     | JUnit 5, Mockito, AssertJ, Testcontainers      |
 | Extras      | Lombok, MapStruct, OpenAPI, Actuator, Resilience4j |
 
+## Documentación
+
+Guía completa de conceptos por fase (con sección especial sobre **Testcontainers**):
+abre [`docs/guia.html`](docs/guia.html) en el navegador.
+
 ## Estructura del repositorio
 
 ```
 spring-ecommerce-lab/
-├── backend/        # API REST Spring Boot
+├── backend/                         # API REST Spring Boot (arquitectura hexagonal)
 │   ├── pom.xml
-│   └── src/
-└── frontend/       # SPA Angular (se añade en la Fase 7)
+│   └── src/main/java/com/lab/ecommerce/
+│       ├── domain/                  # núcleo: modelo y excepciones (sin frameworks)
+│       ├── application/             # puertos (in/out) y casos de uso
+│       └── infrastructure/adapter/  # adaptadores web (in) y persistencia (out)
+├── frontend/                        # SPA Angular (Fase 7)
+└── docs/guia.html                   # guía de conceptos por fase
 ```
 
 ## Hoja de ruta
 
 - [x] **Fase 0 — Setup**: estructura, Maven, Spring Boot arrancable, Actuator.
-- [ ] **Fase 1 — CRUD**: entidades JPA, H2, repositorios, DTOs + MapStruct, validación, controllers REST.
+- [x] **Fase 1 — CRUD (hexagonal)**: arquitectura puertos/adaptadores, JPA + H2, DTOs + MapStruct, validación, CRUD REST.
 - [ ] **Fase 2 — Servicios y buenas prácticas**: capas, `@ControllerAdvice`, paginación, logging.
 - [ ] **Fase 3 — Patrones de diseño**: Strategy, Factory, Builder, Template Method.
 - [ ] **Fase 4 — Testing**: JUnit 5, Mockito, AssertJ, slices (`@WebMvcTest`, `@DataJpaTest`), Testcontainers.
@@ -54,5 +63,11 @@ Comprobaciones rápidas:
 
 ```bash
 cd backend
-mvn test
+mvn test     # tests unitarios (*Test, Surefire)
+mvn verify   # + tests de integración (*IT, Failsafe): CRUD end-to-end
 ```
+
+## Endpoints principales
+
+- `GET/POST /api/products`, `GET/PUT/DELETE /api/products/{id}` — CRUD de productos
+- Consola H2: http://localhost:8080/h2-console (JDBC `jdbc:h2:mem:shopdb`, user `sa`)

@@ -1,6 +1,29 @@
 spring:
   application:
     name: ecommerce-backend
+  profiles:
+    active: dev
+
+  # Base de datos en memoria H2 para desarrollo
+  datasource:
+    url: jdbc:h2:mem:shopdb;DB_CLOSE_DELAY=-1
+    driver-class-name: org.h2.Driver
+    username: sa
+    password: ""
+
+  jpa:
+    hibernate:
+      ddl-auto: create-drop   # crea el esquema al arrancar y lo borra al parar (solo dev)
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+
+  # Consola web de H2 en http://localhost:8080/h2-console
+  h2:
+    console:
+      enabled: true
+      path: /h2-console
 
 server:
   port: 8080

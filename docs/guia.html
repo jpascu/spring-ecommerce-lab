@@ -1,0 +1,575 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Guía spring-ecommerce-lab — Conceptos por fase</title>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --bg-soft: #1e293b;
+      --panel: #ffffff;
+      --text: #1e293b;
+      --muted: #64748b;
+      --accent: #2563eb;
+      --accent-soft: #dbeafe;
+      --green: #16a34a;
+      --amber: #d97706;
+      --code-bg: #0f172a;
+      --code-text: #e2e8f0;
+      --border: #e2e8f0;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      color: var(--text);
+      background: #f8fafc;
+      line-height: 1.65;
+    }
+    .layout { display: flex; min-height: 100vh; }
+    nav.sidebar {
+      width: 290px;
+      background: var(--bg);
+      color: #cbd5e1;
+      padding: 24px 18px;
+      position: sticky;
+      top: 0;
+      height: 100vh;
+      overflow-y: auto;
+      flex-shrink: 0;
+    }
+    nav.sidebar h1 { color: #fff; font-size: 18px; margin: 0 0 4px; }
+    nav.sidebar .sub { color: #64748b; font-size: 12px; margin-bottom: 20px; }
+    nav.sidebar a {
+      display: block; color: #cbd5e1; text-decoration: none;
+      padding: 6px 10px; border-radius: 8px; font-size: 14px; margin: 2px 0;
+    }
+    nav.sidebar a:hover { background: var(--bg-soft); color: #fff; }
+    nav.sidebar .group { margin-top: 16px; font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: #475569; padding: 0 10px; }
+    main { flex: 1; padding: 40px 56px; max-width: 980px; }
+    section { margin-bottom: 56px; scroll-margin-top: 20px; }
+    h2 { font-size: 28px; border-bottom: 2px solid var(--border); padding-bottom: 8px; margin-top: 0; }
+    h3 { font-size: 20px; color: var(--accent); margin-top: 32px; }
+    h4 { font-size: 16px; margin-top: 24px; }
+    p, li { font-size: 15px; }
+    code:not(pre code) {
+      background: var(--accent-soft); color: #1e40af; padding: 1px 6px;
+      border-radius: 5px; font-size: 13.5px; font-family: "SF Mono", Menlo, Consolas, monospace;
+    }
+    pre {
+      background: var(--code-bg); color: var(--code-text); padding: 18px 20px;
+      border-radius: 12px; overflow-x: auto; font-size: 13px; line-height: 1.55;
+      font-family: "SF Mono", Menlo, Consolas, monospace;
+    }
+    pre .c { color: #64748b; }
+    pre .k { color: #93c5fd; }
+    pre .s { color: #86efac; }
+    pre .a { color: #fcd34d; }
+    .badge {
+      display: inline-block; font-size: 11px; font-weight: 600; padding: 2px 10px;
+      border-radius: 999px; margin-left: 8px; vertical-align: middle;
+    }
+    .badge.done { background: #dcfce7; color: var(--green); }
+    .badge.next { background: #fef3c7; color: var(--amber); }
+    .badge.todo { background: #e2e8f0; color: var(--muted); }
+    .card {
+      background: var(--panel); border: 1px solid var(--border); border-radius: 12px;
+      padding: 20px 24px; margin: 18px 0;
+    }
+    .note { border-left: 4px solid var(--accent); background: #eff6ff; padding: 12px 18px; border-radius: 8px; margin: 16px 0; }
+    .tip { border-left: 4px solid var(--green); background: #f0fdf4; padding: 12px 18px; border-radius: 8px; margin: 16px 0; }
+    .warn { border-left: 4px solid var(--amber); background: #fffbeb; padding: 12px 18px; border-radius: 8px; margin: 16px 0; }
+    table { width: 100%; border-collapse: collapse; margin: 18px 0; font-size: 14px; }
+    th, td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--border); }
+    th { background: #f1f5f9; }
+    .hero { background: linear-gradient(135deg, #1e3a8a, #2563eb); color: #fff; padding: 36px 40px; border-radius: 16px; margin-bottom: 40px; }
+    .hero h2 { color: #fff; border: none; margin: 0 0 8px; }
+    .hero p { color: #dbeafe; margin: 0; }
+    .pill-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
+    .pill { background: rgba(255,255,255,.15); color: #fff; padding: 4px 12px; border-radius: 999px; font-size: 13px; }
+    footer { color: var(--muted); font-size: 13px; border-top: 1px solid var(--border); padding-top: 20px; }
+    a.anchor { color: var(--accent); }
+  </style>
+</head>
+<body>
+<div class="layout">
+  <nav class="sidebar">
+    <h1>spring-ecommerce-lab</h1>
+    <div class="sub">Guía de conceptos por fase</div>
+    <a href="#intro">Introducción</a>
+    <a href="#stack">Stack &amp; arquitectura</a>
+    <div class="group">Fases</div>
+    <a href="#fase0">Fase 0 — Setup ✅</a>
+    <a href="#fase1">Fase 1 — CRUD</a>
+    <a href="#fase2">Fase 2 — Servicios</a>
+    <a href="#fase3">Fase 3 — Patrones</a>
+    <a href="#fase4">Fase 4 — Testing</a>
+    <a href="#fase5">Fase 5 — Librerías</a>
+    <a href="#fase6">Fase 6 — Async/Eventos</a>
+    <a href="#fase7">Fase 7 — Angular</a>
+    <a href="#fase8">Fase 8 — Calidad/CI</a>
+    <div class="group">Especiales</div>
+    <a href="#testcontainers">🐳 Testcontainers (deep dive)</a>
+    <a href="#anotaciones">Glosario de anotaciones</a>
+  </nav>
+
+  <main>
+    <div class="hero">
+      <h2>Guía de aprendizaje full-stack</h2>
+      <p>Documentación viva que crece con cada fase del proyecto. Backend Spring Boot + Angular, con foco en buenas prácticas, patrones y testing moderno.</p>
+      <div class="pill-row">
+        <span class="pill">Java 21</span>
+        <span class="pill">Spring Boot 3.3</span>
+        <span class="pill">Maven</span>
+        <span class="pill">H2 / PostgreSQL</span>
+        <span class="pill">Testcontainers</span>
+        <span class="pill">Angular</span>
+      </div>
+    </div>
+
+    <section id="intro">
+      <h2>Introducción</h2>
+      <p>Este documento explica <strong>todos los conceptos</strong> que vamos aplicando, fase a fase. La idea es que sirva
+      como material de estudio: cada sección describe <em>qué</em> introducimos, <em>por qué</em>, y <em>cómo</em> se aplica,
+      con ejemplos de código reales del proyecto.</p>
+      <div class="note">Las fases marcadas con <span class="badge done">hecho</span> ya están implementadas y documentadas.
+      El resto se irán completando a medida que avancemos.</div>
+    </section>
+
+    <section id="stack">
+      <h2>Stack &amp; arquitectura</h2>
+      <table>
+        <tr><th>Capa</th><th>Tecnología</th><th>Para qué</th></tr>
+        <tr><td>Lenguaje</td><td>Java 21</td><td>LTS moderno (records, virtual threads, pattern matching)</td></tr>
+        <tr><td>Backend</td><td>Spring Boot 3.3</td><td>API REST, inyección de dependencias, autoconfiguración</td></tr>
+        <tr><td>Persistencia</td><td>Spring Data JPA + H2</td><td>ORM y BBDD en memoria para desarrollo</td></tr>
+        <tr><td>Tests de integración</td><td>Testcontainers + PostgreSQL</td><td>BBDD real y efímera en Docker</td></tr>
+        <tr><td>Mapeo</td><td>MapStruct</td><td>Conversión entidad ↔ DTO en tiempo de compilación</td></tr>
+        <tr><td>Frontend</td><td>Angular</td><td>SPA que consume la API</td></tr>
+      </table>
+      <p>Estructura de carpetas (monorepo):</p>
+      <pre><span class="c"># raíz del repositorio</span>
+spring-ecommerce-lab/
+├── backend/        <span class="c"># API REST Spring Boot</span>
+│   ├── pom.xml
+│   └── src/main/java/com/lab/ecommerce/
+├── frontend/       <span class="c"># SPA Angular (Fase 7)</span>
+└── docs/guia.html  <span class="c"># esta guía</span></pre>
+    </section>
+
+    <section id="fase0">
+      <h2>Fase 0 — Setup <span class="badge done">hecho</span></h2>
+      <p>Objetivo: tener un proyecto Spring Boot <strong>arrancable, compilando y con un test de humo</strong>.</p>
+
+      <h3>Conceptos clave</h3>
+
+      <h4>1. Maven y el <code>spring-boot-starter-parent</code></h4>
+      <p>Maven gestiona dependencias y el ciclo de build. Heredamos de un <em>parent POM</em> que ya define versiones
+      coherentes de todas las librerías de Spring (BOM — <em>Bill of Materials</em>), por lo que no tenemos que indicar
+      versiones manualmente en cada dependencia.</p>
+      <pre><span class="a">&lt;parent&gt;</span>
+  <span class="a">&lt;groupId&gt;</span>org.springframework.boot<span class="a">&lt;/groupId&gt;</span>
+  <span class="a">&lt;artifactId&gt;</span>spring-boot-starter-parent<span class="a">&lt;/artifactId&gt;</span>
+  <span class="a">&lt;version&gt;</span>3.3.5<span class="a">&lt;/version&gt;</span>
+<span class="a">&lt;/parent&gt;</span></pre>
+
+      <h4>2. Starters</h4>
+      <p>Dependencias "paraguas" que agrupan todo lo necesario para una funcionalidad:</p>
+      <table>
+        <tr><th>Starter</th><th>Trae</th></tr>
+        <tr><td><code>spring-boot-starter-web</code></td><td>Spring MVC, Jackson (JSON), servidor Tomcat embebido</td></tr>
+        <tr><td><code>spring-boot-starter-actuator</code></td><td>Endpoints de observabilidad (health, metrics)</td></tr>
+        <tr><td><code>spring-boot-starter-test</code></td><td>JUnit 5, Mockito, AssertJ, Spring Test</td></tr>
+      </table>
+
+      <h4>3. <code>@SpringBootApplication</code></h4>
+      <p>Anotación compuesta. Equivale a tres anotaciones juntas:</p>
+      <ul>
+        <li><code>@Configuration</code> — la clase puede definir <em>beans</em>.</li>
+        <li><code>@EnableAutoConfiguration</code> — Spring configura automáticamente según lo que hay en el classpath.</li>
+        <li><code>@ComponentScan</code> — escanea el paquete y subpaquetes buscando componentes.</li>
+      </ul>
+      <pre><span class="k">@SpringBootApplication</span>
+<span class="k">public class</span> EcommerceApplication {
+  <span class="k">public static void</span> main(String[] args) {
+    SpringApplication.run(EcommerceApplication.class, args);
+  }
+}</pre>
+
+      <h4>4. <code>@RestController</code> y mapeo de rutas</h4>
+      <p>Un <code>@RestController</code> combina <code>@Controller</code> + <code>@ResponseBody</code>: lo que devuelve cada
+      método se serializa directamente a JSON. <code>@RequestMapping</code> define la ruta base y <code>@GetMapping</code> el verbo HTTP.</p>
+      <pre><span class="k">@RestController</span>
+<span class="k">@RequestMapping</span>(<span class="s">"/api/ping"</span>)
+<span class="k">public class</span> PingController {
+  <span class="k">@GetMapping</span>
+  <span class="k">public</span> Map&lt;String, Object&gt; ping() {
+    <span class="k">return</span> Map.of(<span class="s">"status"</span>, <span class="s">"ok"</span>);
+  }
+}</pre>
+
+      <h4>5. Configuración externalizada (<code>application.yml</code>)</h4>
+      <p>Spring lee la configuración de <code>application.yml</code>/<code>.properties</code>. Aquí definimos puerto, nombre
+      de la app y qué endpoints de Actuator exponer. Esto permite cambiar comportamiento <strong>sin recompilar</strong>.</p>
+
+      <h4>6. Test de humo (smoke test)</h4>
+      <p><code>@SpringBootTest</code> levanta el contexto completo de Spring. Si el contexto arranca sin errores, el test pasa.
+      Es la primera red de seguridad: detecta beans mal configurados.</p>
+
+      <div class="tip"><strong>Relación con tus proyectos de riesgos:</strong> esta misma base (starters, autoconfiguración,
+      Actuator, perfiles) es exactamente la que usan los microservicios CBRM. Dominar la Fase 0 te da el esqueleto mental
+      de cualquier servicio Spring Boot corporativo.</div>
+
+      <h3>Cómo se prueba la Fase 0</h3>
+      <p>Hay <strong>tres formas</strong> de verificar que el setup funciona, de la más automática a la más manual:</p>
+
+      <h4>1. Test automatizado (lo ejecuta Maven)</h4>
+      <p>El <em>smoke test</em> <code>EcommerceApplicationTests.contextLoads()</code> arranca el contexto. Para lanzarlo:</p>
+      <pre><span class="c"># desde la carpeta backend/</span>
+mvn test</pre>
+      <p>Si ves <code>BUILD SUCCESS</code> y el banner de Spring Boot en el log, el contexto levanta correctamente.</p>
+
+      <h4>2. Arrancar la aplicación y llamar a los endpoints</h4>
+      <pre><span class="c"># arranca el servidor en el puerto 8080</span>
+mvn spring-boot:run</pre>
+      <p>Con la app levantada, en otra terminal (o en el navegador):</p>
+      <pre><span class="c"># nuestro endpoint de prueba</span>
+curl http://localhost:8080/api/ping
+<span class="c"># => {"status":"ok","message":"ecommerce-backend funcionando","timestamp":"..."}</span>
+
+<span class="c"># endpoint de salud de Actuator</span>
+curl http://localhost:8080/actuator/health
+<span class="c"># => {"status":"UP",...}</span></pre>
+
+      <h4>3. Compilación completa (empaquetar el jar)</h4>
+      <pre>mvn clean package
+<span class="c"># genera target/ecommerce-backend-0.0.1-SNAPSHOT.jar</span>
+java -jar target/ecommerce-backend-0.0.1-SNAPSHOT.jar</pre>
+
+      <div class="note"><strong>Resumen:</strong> <code>mvn test</code> = verificación rápida sin servidor;
+      <code>mvn spring-boot:run</code> + <code>curl</code> = verificación funcional real; <code>mvn package</code> = artefacto desplegable.</div>
+    </section>
+
+    <section id="fase1">
+      <h2>Fase 1 — CRUD con arquitectura hexagonal <span class="badge done">hecho</span></h2>
+      <p>Implementamos el CRUD de <code>Product</code> sobre <strong>JPA + H2 en memoria</strong>, pero organizado con
+      <strong>arquitectura hexagonal (puertos y adaptadores)</strong>, DTOs con <strong>MapStruct</strong> y validación con
+      <strong>Bean Validation</strong>.</p>
+
+      <h3>¿Qué es la arquitectura hexagonal?</h3>
+      <p>También llamada <em>Ports &amp; Adapters</em>. La idea central: el <strong>dominio</strong> (la lógica de negocio) no
+      depende de ningún framework ni tecnología concreta. Todo lo externo (HTTP, base de datos) entra a través de
+      <strong>puertos</strong> (interfaces) implementados por <strong>adaptadores</strong>.</p>
+      <ul>
+        <li><strong>Puerto de entrada (driving):</strong> interfaz que define los casos de uso. La invoca el adaptador web.</li>
+        <li><strong>Puerto de salida (driven):</strong> interfaz que el dominio necesita (ej. persistencia). La implementa un adaptador.</li>
+        <li><strong>Regla de oro — dependencias hacia dentro:</strong> infraestructura → aplicación → dominio. Nunca al revés.</li>
+      </ul>
+      <pre>        HTTP/JSON                          dominio puro                      JPA/H2
+   ┌──────────────────┐   in    ┌───────────────────────┐   out   ┌────────────────────┐
+   │  ProductController│ ──────▶ │ ProductService (puerto)│ ──────▶ │ ProductRepositoryPort│
+   │   (adaptador in)  │         │   ProductServiceImpl   │         │  (puerto out)        │
+   └──────────────────┘         └───────────────────────┘         └─────────┬──────────┘
+                                                                              │ implementa
+                                                                   ┌──────────▼──────────┐
+                                                                   │ ProductPersistence  │
+                                                                   │ Adapter (JPA)       │
+                                                                   └─────────────────────┘</pre>
+
+      <h3>Mapeo de carpetas a la teoría</h3>
+      <table>
+        <tr><th>Paquete</th><th>Rol hexagonal</th></tr>
+        <tr><td><code>domain.model.Product</code></td><td>Modelo de dominio puro (sin JPA)</td></tr>
+        <tr><td><code>domain.exception.*</code></td><td>Errores de negocio agnósticos al framework</td></tr>
+        <tr><td><code>application.port.in.ProductService</code></td><td>Puerto de entrada (caso de uso)</td></tr>
+        <tr><td><code>application.port.out.ProductRepositoryPort</code></td><td>Puerto de salida (persistencia)</td></tr>
+        <tr><td><code>application.service.ProductServiceImpl</code></td><td>Lógica de negocio; depende solo de puertos</td></tr>
+        <tr><td><code>infrastructure.adapter.in.web.*</code></td><td>Adaptador REST (controller, DTOs, mappers, advice)</td></tr>
+        <tr><td><code>infrastructure.adapter.out.persistence.*</code></td><td>Adaptador JPA (entidad, repo Spring Data, adapter)</td></tr>
+      </table>
+      <div class="warn"><strong>Dos modelos distintos:</strong> <code>Product</code> (dominio) y <code>ProductJpaEntity</code>
+      (persistencia) son clases separadas. El <code>ProductPersistenceMapper</code> traduce entre ambas. Así las anotaciones
+      de Hibernate no "infectan" el dominio.</div>
+
+      <h3>Conceptos clave de la fase</h3>
+
+      <h4>1. Spring Data JPA</h4>
+      <p>El repositorio Spring Data vive en el adaptador. Al extender <code>JpaRepository</code> obtenemos el CRUD sin escribir SQL:</p>
+      <pre><span class="k">public interface</span> ProductJpaRepository
+    <span class="k">extends</span> JpaRepository&lt;ProductJpaEntity, Long&gt; { }</pre>
+
+      <h4>2. Entidad JPA y timestamps automáticos</h4>
+      <p><code>@Entity</code> mapea la clase a una tabla. <code>@CreationTimestamp</code> / <code>@UpdateTimestamp</code> (Hibernate)
+      rellenan las fechas automáticamente al insertar/actualizar.</p>
+
+      <h4>3. DTOs + MapStruct (dos mappers)</h4>
+      <p>Usamos <code>record</code> inmutables como DTOs. <strong>MapStruct</strong> genera los mappers en tiempo de compilación
+      (sin reflexión). En hexagonal hay <strong>dos</strong>: web↔dominio y dominio↔entidad.</p>
+      <pre><span class="k">@Mapper</span>(componentModel = <span class="s">"spring"</span>)
+<span class="k">public interface</span> ProductWebMapper {
+  Product toDomain(ProductRequest request);
+  ProductResponse toResponse(Product product);
+}</pre>
+      <div class="note"><strong>MapStruct + Lombok:</strong> requieren orden en el <code>annotationProcessorPaths</code> del
+      <code>maven-compiler-plugin</code>: primero <code>lombok</code>, luego <code>lombok-mapstruct-binding</code>, luego
+      <code>mapstruct-processor</code>. Si no, MapStruct no "ve" los getters/setters generados por Lombok.</div>
+
+      <h4>4. Validación (Bean Validation)</h4>
+      <p>Anotaciones como <code>@NotBlank</code>, <code>@NotNull</code>, <code>@PositiveOrZero</code> en el DTO, activadas con
+      <code>@Valid</code> en el controller. Una petición inválida devuelve <strong>400</strong> automáticamente.</p>
+
+      <h4>5. Diseño REST del controller</h4>
+      <table>
+        <tr><th>Verbo</th><th>Ruta</th><th>Acción</th><th>Código</th></tr>
+        <tr><td>GET</td><td>/api/products</td><td>Listar</td><td>200</td></tr>
+        <tr><td>GET</td><td>/api/products/{id}</td><td>Obtener uno</td><td>200 / 404</td></tr>
+        <tr><td>POST</td><td>/api/products</td><td>Crear</td><td>201 + Location</td></tr>
+        <tr><td>PUT</td><td>/api/products/{id}</td><td>Actualizar</td><td>200 / 404</td></tr>
+        <tr><td>DELETE</td><td>/api/products/{id}</td><td>Borrar</td><td>204 / 404</td></tr>
+      </table>
+
+      <h4>6. Transacciones</h4>
+      <p><code>@Transactional(readOnly = true)</code> a nivel de clase del servicio; los métodos de escritura lo sobreescriben
+      con <code>@Transactional</code>.</p>
+
+      <h4>7. Manejo de errores en el borde</h4>
+      <p>La excepción de dominio <code>ProductNotFoundException</code> es pura. El <code>WebExceptionHandler</code>
+      (<code>@RestControllerAdvice</code>) la traduce a 404. En la Fase 2 lo ampliaremos.</p>
+
+      <h3>Cómo se prueba la Fase 1</h3>
+      <h4>Tests automáticos</h4>
+      <pre><span class="c"># unitarios (*Test) con Surefire</span>
+mvn test
+
+<span class="c"># + integración (*IT) con Failsafe: ProductControllerIT ejercita todo el CRUD</span>
+mvn verify</pre>
+      <div class="note"><strong>Convención IT vs Test:</strong> <code>mvn test</code> ejecuta <code>*Test</code> (Surefire);
+      los <code>*IT</code> los ejecuta <strong>Failsafe</strong> en <code>mvn verify</code>. Por eso añadimos el plugin
+      <code>maven-failsafe-plugin</code> al POM.</div>
+
+      <h4>Manualmente (con la app arrancada)</h4>
+      <pre><span class="c"># crear</span>
+curl -X POST http://localhost:8080/api/products -H "Content-Type: application/json" \
+  -d '{"name":"Webcam","description":"1080p","price":59.99,"stock":20,"category":"Perifericos"}'
+
+<span class="c"># listar</span>
+curl http://localhost:8080/api/products</pre>
+      <p>Con el perfil <code>dev</code> activo, el <code>DataSeeder</code> precarga 3 productos. También puedes inspeccionar la
+      BBDD en la consola H2: <code>http://localhost:8080/h2-console</code> (JDBC URL <code>jdbc:h2:mem:shopdb</code>, usuario <code>sa</code>).</p>
+
+      <div class="tip"><strong>Relación con riesgos:</strong> la separación puerto/adaptador es ideal para motores de decisión:
+      el "core" de reglas queda aislado y los bureaus externos (Schufa, CCC...) o la persistencia (Dynamo/Postgres) son
+      adaptadores intercambiables y fácilmente <em>mockeables</em> en test.</div>
+    </section>
+
+    <section id="fase2">
+      <h2>Fase 2 — Servicios &amp; buenas prácticas <span class="badge todo">pendiente</span></h2>
+      <p>Separación de capas, manejo global de errores (<code>@ControllerAdvice</code>), paginación y logging estructurado.</p>
+    </section>
+
+    <section id="fase3">
+      <h2>Fase 3 — Patrones de diseño <span class="badge todo">pendiente</span></h2>
+      <p>Strategy, Factory, Builder y Template Method aplicados a casos reales (muy relevante para motores de reglas tipo riesgos).</p>
+    </section>
+
+    <section id="fase4">
+      <h2>Fase 4 — Testing <span class="badge todo">pendiente</span></h2>
+      <p>JUnit 5, Mockito, AssertJ, test de <em>slices</em> (<code>@WebMvcTest</code>, <code>@DataJpaTest</code>) y
+      <strong>Testcontainers</strong> (ver sección dedicada más abajo).</p>
+    </section>
+
+    <section id="fase5">
+      <h2>Fase 5 — Librerías Spring <span class="badge todo">pendiente</span></h2>
+      <p>OpenAPI/Swagger, Actuator avanzado, Resilience4j, Spring Cache y Spring Security + JWT.</p>
+    </section>
+
+    <section id="fase6">
+      <h2>Fase 6 — Async &amp; eventos <span class="badge todo">pendiente</span></h2>
+      <p><code>@Async</code>, eventos de aplicación y mensajería.</p>
+    </section>
+
+    <section id="fase7">
+      <h2>Fase 7 — Frontend Angular <span class="badge todo">pendiente</span></h2>
+      <p>SPA Angular que consume la API REST: servicios HTTP, componentes, routing y formularios.</p>
+    </section>
+
+    <section id="fase8">
+      <h2>Fase 8 — Calidad &amp; CI <span class="badge todo">pendiente</span></h2>
+      <p>Docker, docker-compose y GitHub Actions para integración continua.</p>
+    </section>
+
+    <!-- ============================ TESTCONTAINERS ============================ -->
+    <section id="testcontainers">
+      <h2>🐳 Testcontainers — Guía en profundidad</h2>
+      <div class="note">Sección destacada por petición expresa. La iremos ampliando con ejemplos ejecutables del proyecto
+      en la Fase 4, pero aquí tienes ya la base conceptual completa.</div>
+
+      <h3>¿Qué es Testcontainers?</h3>
+      <p><strong>Testcontainers</strong> es una librería Java que permite arrancar <strong>contenedores Docker reales</strong>
+      (bases de datos, brokers de mensajería, etc.) <em>desde tus tests</em>, de forma programática. El contenedor se crea
+      antes del test y se destruye al terminar. Así pruebas contra la <strong>tecnología real</strong> (PostgreSQL, Kafka,
+      LocalStack...) en lugar de simulaciones.</p>
+
+      <h3>El problema que resuelve</h3>
+      <table>
+        <tr><th>Enfoque</th><th>Problema</th></tr>
+        <tr><td>BBDD en memoria (H2) para tests</td><td>H2 no es PostgreSQL: dialectos SQL distintos, tipos como <code>JSONB</code> no existen, funciones propias fallan. "Pasa en test, falla en prod".</td></tr>
+        <tr><td>BBDD compartida de entorno</td><td>Tests no aislados, datos sucios, dependes de que el entorno esté arriba.</td></tr>
+        <tr><td>Mocks de todo</td><td>No prueban la integración real (SQL, migraciones Flyway, índices).</td></tr>
+      </table>
+      <div class="tip"><strong>Testcontainers</strong> te da una PostgreSQL <em>real, limpia y efímera</em> por ejecución de tests.
+      Es justo lo que necesitas para los servicios CBRM de Spain (cf-es), que usan PostgreSQL + Flyway + JSONB.</div>
+
+      <h3>Requisitos</h3>
+      <ul>
+        <li>Un entorno Docker en marcha (Docker Desktop, Colima, Rancher Desktop, Podman...).</li>
+        <li>Las dependencias de Testcontainers en el <code>pom.xml</code>.</li>
+      </ul>
+
+      <h3>Dependencias Maven</h3>
+      <pre><span class="c">&lt;!-- BOM: alinea versiones de todos los módulos de Testcontainers --&gt;</span>
+<span class="a">&lt;dependencyManagement&gt;</span>
+  <span class="a">&lt;dependencies&gt;</span>
+    <span class="a">&lt;dependency&gt;</span>
+      <span class="a">&lt;groupId&gt;</span>org.testcontainers<span class="a">&lt;/groupId&gt;</span>
+      <span class="a">&lt;artifactId&gt;</span>testcontainers-bom<span class="a">&lt;/artifactId&gt;</span>
+      <span class="a">&lt;version&gt;</span>1.20.4<span class="a">&lt;/version&gt;</span>
+      <span class="a">&lt;type&gt;</span>pom<span class="a">&lt;/type&gt;</span>
+      <span class="a">&lt;scope&gt;</span>import<span class="a">&lt;/scope&gt;</span>
+    <span class="a">&lt;/dependency&gt;</span>
+  <span class="a">&lt;/dependencies&gt;</span>
+<span class="a">&lt;/dependencyManagement&gt;</span>
+
+<span class="c">&lt;!-- Dependencias de test --&gt;</span>
+<span class="a">&lt;dependency&gt;</span>
+  <span class="a">&lt;groupId&gt;</span>org.testcontainers<span class="a">&lt;/groupId&gt;</span>
+  <span class="a">&lt;artifactId&gt;</span>junit-jupiter<span class="a">&lt;/artifactId&gt;</span>
+  <span class="a">&lt;scope&gt;</span>test<span class="a">&lt;/scope&gt;</span>
+<span class="a">&lt;/dependency&gt;</span>
+<span class="a">&lt;dependency&gt;</span>
+  <span class="a">&lt;groupId&gt;</span>org.testcontainers<span class="a">&lt;/groupId&gt;</span>
+  <span class="a">&lt;artifactId&gt;</span>postgresql<span class="a">&lt;/artifactId&gt;</span>
+  <span class="a">&lt;scope&gt;</span>test<span class="a">&lt;/scope&gt;</span>
+<span class="a">&lt;/dependency&gt;</span></pre>
+
+      <h3>Enfoque A — Clásico con <code>@Testcontainers</code></h3>
+      <p>Anotas la clase de test, declaras el contenedor como campo <code>static</code> y conectas Spring a la BBDD con
+      <code>@DynamicPropertySource</code> (porque el puerto es aleatorio y solo se conoce en tiempo de ejecución).</p>
+      <pre><span class="k">@SpringBootTest</span>
+<span class="k">@Testcontainers</span>
+<span class="k">class</span> ProductRepositoryIT {
+
+  <span class="k">@Container</span>
+  <span class="k">static</span> PostgreSQLContainer&lt;?&gt; postgres =
+      <span class="k">new</span> PostgreSQLContainer&lt;&gt;(<span class="s">"postgres:16-alpine"</span>)
+          .withDatabaseName(<span class="s">"shop"</span>)
+          .withUsername(<span class="s">"test"</span>)
+          .withPassword(<span class="s">"test"</span>);
+
+  <span class="k">@DynamicPropertySource</span>
+  <span class="k">static void</span> props(DynamicPropertyRegistry registry) {
+    registry.add(<span class="s">"spring.datasource.url"</span>, postgres::getJdbcUrl);
+    registry.add(<span class="s">"spring.datasource.username"</span>, postgres::getUsername);
+    registry.add(<span class="s">"spring.datasource.password"</span>, postgres::getPassword);
+  }
+
+  <span class="c">// ... tests que usan el repositorio contra PostgreSQL real</span>
+}</pre>
+      <div class="note"><strong><code>static</code> importa:</strong> un contenedor <code>static</code> se arranca <em>una vez</em>
+      para toda la clase (rápido). Si no es estático, se crea uno por cada método de test (lento pero más aislado).</div>
+
+      <h3>Enfoque B — Moderno con <code>@ServiceConnection</code> (Spring Boot 3.1+)</h3>
+      <p>Spring Boot 3.1 introdujo soporte nativo: con <code>@ServiceConnection</code> <strong>ya no necesitas</strong>
+      <code>@DynamicPropertySource</code>. Spring detecta el contenedor y configura el <code>DataSource</code> automáticamente.</p>
+      <pre><span class="c">&lt;!-- dependencia extra --&gt;</span>
+<span class="c">// org.springframework.boot:spring-boot-testcontainers (scope test)</span>
+
+<span class="k">@SpringBootTest</span>
+<span class="k">@Testcontainers</span>
+<span class="k">class</span> ProductRepositoryIT {
+
+  <span class="k">@Container</span>
+  <span class="k">@ServiceConnection</span>
+  <span class="k">static</span> PostgreSQLContainer&lt;?&gt; postgres =
+      <span class="k">new</span> PostgreSQLContainer&lt;&gt;(<span class="s">"postgres:16-alpine"</span>);
+
+  <span class="c">// Spring conecta solo. ¡Sin propiedades manuales!</span>
+}</pre>
+      <div class="tip">Este es el enfoque <strong>recomendado hoy</strong> y el que usaremos en la Fase 4.</div>
+
+      <h3>Patrón "clase base" reutilizable</h3>
+      <p>Para no repetir el contenedor en cada test de integración, se crea una clase base abstracta que todos heredan.
+      Así el contenedor se reutiliza entre clases (Singleton Container pattern).</p>
+      <pre><span class="k">public abstract class</span> AbstractPostgresIT {
+  <span class="k">@Container</span> <span class="k">@ServiceConnection</span>
+  <span class="k">static final</span> PostgreSQLContainer&lt;?&gt; POSTGRES =
+      <span class="k">new</span> PostgreSQLContainer&lt;&gt;(<span class="s">"postgres:16-alpine"</span>);
+  <span class="k">static</span> { POSTGRES.start(); } <span class="c">// arranque único compartido</span>
+}</pre>
+
+      <h3>Uso con <code>@DataJpaTest</code> (slice de persistencia)</h3>
+      <p>Por defecto <code>@DataJpaTest</code> sustituye tu BBDD por una embebida. Hay que desactivar ese reemplazo para
+      que use el contenedor:</p>
+      <pre><span class="k">@DataJpaTest</span>
+<span class="k">@AutoConfigureTestDatabase</span>(replace = AutoConfigureTestDatabase.Replace.<span class="k">NONE</span>)
+<span class="k">@Testcontainers</span>
+<span class="k">class</span> ProductRepositoryJpaIT <span class="k">extends</span> AbstractPostgresIT {
+  <span class="c">// inyecta el repositorio y prueba consultas reales</span>
+}</pre>
+
+      <h3>Otros módulos útiles</h3>
+      <table>
+        <tr><th>Módulo</th><th>Para qué</th></tr>
+        <tr><td><code>kafka</code></td><td>Probar producción/consumo real de mensajes</td></tr>
+        <tr><td><code>localstack</code></td><td>Emular AWS (SQS, S3, DynamoDB) — ¡ideal para CBRM!</td></tr>
+        <tr><td><code>mockserver</code> / WireMock</td><td>Simular APIs externas (Schufa, CCC...) sobre HTTP real</td></tr>
+        <tr><td><code>GenericContainer</code></td><td>Cualquier imagen Docker arbitraria</td></tr>
+      </table>
+
+      <h3>Buenas prácticas</h3>
+      <ul>
+        <li><strong>Fija la versión de la imagen</strong> (<code>postgres:16-alpine</code>, no <code>latest</code>) para builds reproducibles.</li>
+        <li><strong>Reutiliza contenedores</strong> con contenedor <code>static</code> / clase base: arrancar Docker es lo más lento.</li>
+        <li><strong>Nombra los tests de integración</strong> con sufijo <code>IT</code> y sepáralos de los unitarios (failsafe vs surefire).</li>
+        <li><strong>No metas datos de producción</strong>; usa datos de prueba generados (EasyRandom encaja muy bien).</li>
+        <li><strong>CI:</strong> GitHub Actions ya trae Docker, así que los tests con Testcontainers funcionan sin configuración extra.</li>
+        <li>Considera <strong>Ryuk</strong> (el contenedor "conserje" que limpia recursos automáticamente al acabar).</li>
+      </ul>
+
+      <h3>Coste / contras</h3>
+      <ul>
+        <li>Necesitas Docker disponible en local y en CI.</li>
+        <li>Más lentos que un test unitario puro (arranque de contenedor). Mitigado reutilizando contenedores.</li>
+      </ul>
+    </section>
+
+    <section id="anotaciones">
+      <h2>Glosario de anotaciones</h2>
+      <p>Referencia rápida; se ampliará por fase.</p>
+      <table>
+        <tr><th>Anotación</th><th>Fase</th><th>Qué hace</th></tr>
+        <tr><td><code>@SpringBootApplication</code></td><td>0</td><td>Arranque + autoconfig + scan</td></tr>
+        <tr><td><code>@RestController</code></td><td>0</td><td>Controller REST que serializa a JSON</td></tr>
+        <tr><td><code>@RequestMapping</code> / <code>@GetMapping</code></td><td>0</td><td>Mapeo de rutas y verbos HTTP</td></tr>
+        <tr><td><code>@SpringBootTest</code></td><td>0</td><td>Levanta el contexto completo en tests</td></tr>
+        <tr><td><code>@Entity</code> / <code>@Table</code> / <code>@Id</code></td><td>1</td><td>Mapeo objeto-relacional (JPA)</td></tr>
+        <tr><td><code>@CreationTimestamp</code> / <code>@UpdateTimestamp</code></td><td>1</td><td>Fechas de auditoría automáticas (Hibernate)</td></tr>
+        <tr><td><code>@Mapper</code> (MapStruct)</td><td>1</td><td>Genera el mapper en compilación</td></tr>
+        <tr><td><code>@Valid</code> + <code>@NotBlank</code>/<code>@NotNull</code>/<code>@PositiveOrZero</code></td><td>1</td><td>Validación de entrada (Bean Validation)</td></tr>
+        <tr><td><code>@Service</code> / <code>@Component</code></td><td>1</td><td>Declaran beans de Spring</td></tr>
+        <tr><td><code>@Transactional</code></td><td>1</td><td>Demarca transacciones</td></tr>
+        <tr><td><code>@RestControllerAdvice</code> / <code>@ExceptionHandler</code></td><td>1</td><td>Traduce excepciones a respuestas HTTP</td></tr>
+        <tr><td><code>@Profile</code></td><td>1</td><td>Activa beans solo en ciertos perfiles (ej. dev)</td></tr>
+        <tr><td><code>@Testcontainers</code> / <code>@Container</code></td><td>4</td><td>Gestiona el ciclo de vida de contenedores</td></tr>
+        <tr><td><code>@ServiceConnection</code></td><td>4</td><td>Conecta Spring al contenedor automáticamente</td></tr>
+      </table>
+    </section>
+
+    <footer>
+      <p>spring-ecommerce-lab — guía generada de forma incremental. Última fase documentada: <strong>Fase 1</strong>.</p>
+    </footer>
+  </main>
+</div>
+</body>
+</html>
