@@ -99,6 +99,7 @@
     <div class="sub">Guía de conceptos por fase</div>
     <a href="#intro">Introducción</a>
     <a href="#stack">Stack &amp; arquitectura</a>
+    <a href="#hexagonal">⬡ Arquitectura hexagonal (a fondo)</a>
     <div class="group">Fases</div>
     <a href="#fase0">Fase 0 — Setup ✅</a>
     <a href="#fase1">Fase 1 — CRUD ✅</a>
@@ -362,6 +363,147 @@ curl http://localhost:8080/api/products</pre>
       <div class="tip"><strong>Relación con riesgos:</strong> la separación puerto/adaptador es ideal para motores de decisión:
       el "core" de reglas queda aislado y los bureaus externos (Schufa, CCC...) o la persistencia (Dynamo/Postgres) son
       adaptadores intercambiables y fácilmente <em>mockeables</em> en test.</div>
+    </section>
+
+    <!-- ============================ HEXAGONAL (A FONDO) ============================ -->
+    <section id="hexagonal">
+      <h2>⬡ Arquitectura hexagonal a fondo</h2>
+      <p>La <strong>arquitectura hexagonal</strong> (también llamada <em>Ports &amp; Adapters</em>, propuesta por Alistair
+      Cockburn en 2005) es un estilo para organizar el código de forma que la <strong>lógica de negocio quede aislada</strong>
+      de la tecnología (web, base de datos, mensajería...). Es el concepto vertebral de este proyecto, así que vamos a
+      explicarlo con calma: el <em>problema</em> que resuelve, su <em>vocabulario</em>, cómo se ve en nuestro código y cómo se
+      compara con la arquitectura "clásica" de capas.</p>
+
+      <h3>1. El problema que resuelve</h3>
+      <p>En una aplicación típica de capas, la lógica de negocio acaba <strong>mezclada</strong> con detalles técnicos: el
+      servicio importa entidades JPA, conoce <code>HttpServletRequest</code>, llama directamente a un cliente HTTP concreto...
+      El resultado:</p>
+      <ul>
+        <li>Cambiar de tecnología (de JPA a Mongo, de REST a Kafka) obliga a tocar la lógica de negocio.</li>
+        <li>Testear el negocio requiere levantar base de datos, web, etc. → tests lentos y frágiles.</li>
+        <li>Las reglas de negocio quedan diluidas entre anotaciones y APIs de frameworks.</li>
+      </ul>
+      <p>La idea central de hexagonal es <strong>invertir esa dependencia</strong>: que la tecnología dependa del negocio, y
+      <strong>nunca al revés</strong>.</p>
+      <div class="note"><strong>La "regla de oro" (regla de dependencia):</strong> las dependencias siempre apuntan
+      <em>hacia dentro</em>, hacia el dominio. El dominio no sabe que existe Spring, JPA, HTTP ni JSON.</div>
+
+      <h3>2. La metáfora del hexágono</h3>
+      <p>Imagina la aplicación como una celda con el <strong>dominio en el centro</strong>. Alrededor hay una frontera con
+      "enchufes" (los <strong>puertos</strong>). Al exterior conectas <strong>adaptadores</strong> en esos enchufes. El hexágono
+      no significa "6 lados" literalmente: solo simboliza que hay <em>varios</em> lados por donde conectar tecnologías.</p>
+      <pre>            LADO DRIVING (primario)                 LADO DRIVEN (secundario)
+            "quién USA la aplicación"                "qué USA la aplicación"
+
+   adaptadores de ENTRADA          ┌───────────────────────────┐         adaptadores de SALIDA
+   ┌─────────────────────┐         │        APPLICATION        │         ┌────────────────────────┐
+   │  REST Controller     │        │   (casos de uso / puertos)│         │  JPA Adapter  (H2)     │
+   │  Scheduler           │ ──────▶ │  ┌─────────────────────┐ │ ──────▶ │  Lake Publisher        │
+   │  Kafka Listener      │ PUERTO  │  │       DOMAIN        │ │ PUERTO  │  Email / Kafka / S3    │
+   │  CLI / GraphQL       │   IN    │  │  modelo + reglas    │ │   OUT   │  Cliente API externa   │
+   └─────────────────────┘         │  └─────────────────────┘ │         └────────────────────────┘
+                                    └───────────────────────────┘
+        implementan el adaptador,        define las INTERFACES         el dominio define la interfaz,
+        consumen el puerto IN            (puertos) y la lógica          el adaptador la IMPLEMENTA
+   ───────────────────────────────────────────────────────────────────────────────────────────────▶
+                              las dependencias apuntan SIEMPRE hacia el centro</pre>
+
+      <h3>3. Vocabulario esencial</h3>
+      <table>
+        <tr><th>Término</th><th>Qué es</th><th>En el proyecto</th></tr>
+        <tr><td><strong>Dominio</strong></td><td>Modelo y reglas de negocio puras. Sin frameworks.</td><td><code>domain/model/Product</code>, <code>domain/event</code>, <code>domain/exception</code></td></tr>
+        <tr><td><strong>Aplicación</strong></td><td>Orquesta los casos de uso usando el dominio y los puertos.</td><td><code>application/service/ProductServiceImpl</code></td></tr>
+        <tr><td><strong>Puerto IN</strong> (driving)</td><td>Interfaz que ofrece la app al exterior (un caso de uso).</td><td><code>application/port/in/ProductService</code></td></tr>
+        <tr><td><strong>Puerto OUT</strong> (driven)</td><td>Interfaz que la app <em>necesita</em> del exterior.</td><td><code>application/port/out/ProductRepositoryPort</code>, <code>ProductEventPublisherPort</code></td></tr>
+        <tr><td><strong>Adaptador primario</strong></td><td>Llama a la app a través de un puerto IN.</td><td><code>ProductController</code>, <code>LowStockScheduler</code></td></tr>
+        <tr><td><strong>Adaptador secundario</strong></td><td>Implementa un puerto OUT con una tecnología concreta.</td><td><code>ProductPersistenceAdapter</code> (JPA), <code>LakeProductEventPublisher</code></td></tr>
+      </table>
+      <div class="tip"><strong>Truco para no confundir IN/OUT:</strong> mira quién <em>manda</em>. Si algo externo llama a la
+      app → es un puerto <strong>IN</strong> (driving). Si la app llama a algo externo → es un puerto <strong>OUT</strong> (driven).</div>
+
+      <h3>4. Driving vs Driven (la clave de la inversión)</h3>
+      <p>La diferencia sutil pero crucial está en <strong>quién define la interfaz</strong>:</p>
+      <ul>
+        <li><strong>Puerto IN:</strong> lo define la aplicación y <em>también lo implementa</em> la aplicación (el servicio). El
+        adaptador de entrada solo lo <em>consume</em>.</li>
+        <li><strong>Puerto OUT:</strong> lo define la aplicación (lo que <em>necesita</em>), pero lo <em>implementa el adaptador</em>
+        externo. Aquí ocurre la <strong>inversión de dependencias</strong>: el detalle (JPA) depende de la abstracción (el puerto),
+        no al revés.</li>
+      </ul>
+      <pre><span class="c">// El dominio/aplicación DEFINE lo que necesita (no sabe que detrás hay JPA):</span>
+<span class="k">public interface</span> ProductRepositoryPort {        <span class="c">// application/port/out</span>
+  Product save(Product product);
+}
+
+<span class="c">// La infraestructura lo IMPLEMENTA con una tecnología concreta:</span>
+<span class="k">@Component</span>
+<span class="k">public class</span> ProductPersistenceAdapter <span class="k">implements</span> ProductRepositoryPort {  <span class="c">// infrastructure</span>
+  <span class="c">// ...usa Spring Data JPA, H2, mappers...</span>
+}</pre>
+
+      <h3>5. Cómo se mapea en nuestro código</h3>
+      <pre>com.lab.ecommerce
+├── domain                         <span class="c"># el CENTRO: sin Spring, sin JPA</span>
+│   ├── model/Product              <span class="c"># entidad de negocio pura</span>
+│   ├── event/ProductChangedEvent  <span class="c"># evento de dominio</span>
+│   └── exception/ProductNotFound  <span class="c"># errores de negocio</span>
+├── application                    <span class="c"># CASOS DE USO + PUERTOS</span>
+│   ├── port/in/ProductService          <span class="c"># puerto IN (lo que ofrecemos)</span>
+│   ├── port/out/ProductRepositoryPort  <span class="c"># puerto OUT (lo que necesitamos)</span>
+│   ├── port/out/ProductEventPublisherPort
+│   └── service/ProductServiceImpl      <span class="c"># implementa el puerto IN</span>
+└── infrastructure                 <span class="c"># LOS ADAPTADORES (el "borde")</span>
+    ├── adapter/in/web/ProductController        <span class="c"># adaptador primario (REST)</span>
+    ├── adapter/in/scheduler/LowStockScheduler  <span class="c"># adaptador primario (tiempo)</span>
+    └── adapter/out/persistence/ProductPersistenceAdapter  <span class="c"># adaptador secundario (JPA)</span></pre>
+      <div class="note">Fíjate que <code>domain</code> y <code>application</code> <strong>no importan nada de Spring ni de JPA</strong>.
+      Toda la tecnología vive en <code>infrastructure</code>. Esa separación física por paquetes es lo que hace que la regla de
+      dependencia sea fácil de respetar (y de vigilar en revisiones).</div>
+
+      <h3>6. Flujo de una petición real (crear producto)</h3>
+      <p>Sigamos un <code>POST /api/products</code> de fuera hacia dentro y de vuelta:</p>
+      <pre>1. <span class="k">ProductController</span> (adaptador IN)   recibe JSON → valida @Valid → mapea DTO a dominio
+2. llama a <span class="k">ProductService</span> (puerto IN)   ── frontera: a partir de aquí, solo dominio ──
+3. <span class="k">ProductServiceImpl</span> (aplicación)     aplica reglas, orquesta el caso de uso
+4. llama a <span class="k">ProductRepositoryPort.save</span> (puerto OUT)  ── pide "guárdame esto" ──
+5. <span class="k">ProductPersistenceAdapter</span> (adaptador OUT)  traduce a entidad JPA y persiste en H2
+6. llama a <span class="k">ProductEventPublisherPort</span> (puerto OUT)  → LakeProductEventPublisher publica el evento
+7. el resultado (dominio) sube por la misma cadena; el controller lo mapea a DTO de respuesta (JSON)</pre>
+      <p>Los pasos 1, 5 y 6 son <strong>intercambiables</strong>: podrías cambiar REST por GraphQL, JPA por Mongo, o el lake por
+      Kafka, <strong>sin tocar</strong> los pasos 2-4 (el negocio).</p>
+
+      <h3>7. Hexagonal vs capas clásicas (Controller → Service → Repository)</h3>
+      <table>
+        <tr><th>Aspecto</th><th>Capas clásicas</th><th>Hexagonal</th></tr>
+        <tr><td>Dirección de dependencia</td><td>Service depende de Repository (JPA) concreto</td><td>Service depende de un <em>puerto</em>; JPA depende del puerto</td></tr>
+        <tr><td>Acoplamiento a frameworks</td><td>El negocio "ve" JPA, web, etc.</td><td>El negocio no conoce ninguna tecnología</td></tr>
+        <tr><td>Testabilidad del negocio</td><td>Suele necesitar BBDD/contexto</td><td>Tests puros con dobles de los puertos</td></tr>
+        <tr><td>Sustituir tecnología</td><td>Impacta al negocio</td><td>Solo cambias el adaptador</td></tr>
+        <tr><td>Coste inicial</td><td>Menor (menos clases)</td><td>Mayor (interfaces + mappers)</td></tr>
+      </table>
+      <p>Es <strong>prima hermana</strong> de la <em>Clean Architecture</em> y la <em>Onion Architecture</em>: las tres comparten
+      la misma idea (dominio en el centro, dependencias hacia dentro), solo cambian los nombres.</p>
+
+      <h3>8. Ventajas y costes (sé honesto)</h3>
+      <div class="tip"><strong>A favor:</strong> negocio aislado y testeable, tecnología intercambiable, límites claros,
+      facilita el trabajo en equipo y la evolución a largo plazo.</div>
+      <div class="warn"><strong>Coste:</strong> más clases e interfaces, mapeos entre modelos (dominio ↔ JPA ↔ DTO) y una curva
+      de aprendizaje. Para un CRUD trivial puede parecer "demasiado". Merece la pena cuando hay <strong>lógica de negocio real</strong>
+      y expectativa de vida/cambio (justo el caso de los motores de decisión de riesgos).</div>
+
+      <h3>9. Preguntas frecuentes</h3>
+      <p><strong>¿El dominio puede usar anotaciones de JPA (<code>@Entity</code>)?</strong> En hexagonal estricto, no: la entidad
+      de dominio es pura y la entidad JPA vive en el adaptador (las separamos con un mapper). Algunos equipos las fusionan por
+      pragmatismo, pero pierden parte del aislamiento.</p>
+      <p><strong>¿Dónde van los DTOs?</strong> En el adaptador que los usa (los DTOs web en <code>adapter/in/web/dto</code>). El
+      dominio no conoce DTOs.</p>
+      <p><strong>¿Un puerto IN por caso de uso o uno por agregado?</strong> Ambos son válidos. Nosotros agrupamos el CRUD en
+      <code>ProductService</code> y separamos un caso de uso distinto (<code>StockMonitorUseCase</code>) aplicando el principio de
+      <em>segregación de interfaces</em>.</p>
+
+      <div class="tip"><strong>Relación con tus proyectos de riesgos:</strong> un motor de decisión es el caso ideal. El "core"
+      de reglas es el dominio; los bureaus externos (Schufa, CCC), la persistencia y la entrada (REST/cola) son adaptadores. Así
+      las reglas se prueban aisladas y los proveedores externos se cambian o se <em>mockean</em> sin tocar la decisión.</div>
     </section>
 
     <section id="fase2">
