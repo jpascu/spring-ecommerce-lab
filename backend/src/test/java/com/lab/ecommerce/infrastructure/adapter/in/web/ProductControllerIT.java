@@ -50,7 +50,20 @@ class ProductControllerIT {
         .andExpect(status().isNoContent());
 
     mockMvc.perform(get("/api/products/{id}", id))
-        .andExpect(status().isNotFound());
+        .andExpect(status().isNotFound())
+        .andExpect(jsonPath("$.status").value(404))
+        .andExpect(jsonPath("$.path").value("/api/products/" + id));
+  }
+
+  @Test
+  void listar_paginado_devuelve_estructura_de_pagina() throws Exception {
+    mockMvc.perform(get("/api/products?page=0&size=5&sort=name&direction=asc"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.content").isArray())
+        .andExpect(jsonPath("$.page").value(0))
+        .andExpect(jsonPath("$.size").value(5))
+        .andExpect(jsonPath("$.totalElements").exists())
+        .andExpect(jsonPath("$.totalPages").exists());
   }
 
   @Test
@@ -60,6 +73,9 @@ class ProductControllerIT {
         """;
     mockMvc.perform(post("/api/products")
             .contentType(MediaType.APPLICATION_JSON).content(invalido))
-        .andExpect(status().isBadRequest());
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.status").value(400))
+        .andExpect(jsonPath("$.fieldErrors").isArray())
+        .andExpect(jsonPath("$.fieldErrors.length()").value(org.hamcrest.Matchers.greaterThanOrEqualTo(3)));
   }
 }

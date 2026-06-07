@@ -1,13 +1,15 @@
 package com.lab.ecommerce.infrastructure.adapter.in.web;
 
+import com.lab.ecommerce.application.common.PageQuery;
+import com.lab.ecommerce.application.common.PageResult;
 import com.lab.ecommerce.application.port.in.ProductService;
 import com.lab.ecommerce.infrastructure.adapter.in.web.dto.ProductRequest;
 import com.lab.ecommerce.infrastructure.adapter.in.web.dto.ProductResponse;
 import com.lab.ecommerce.infrastructure.adapter.in.web.mapper.ProductWebMapper;
 import jakarta.validation.Valid;
 import java.net.URI;
-import java.util.List;
 import lombok.RequiredArgsConstructor;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -34,8 +36,13 @@ public class ProductController {
   private final ProductWebMapper mapper;
 
   @GetMapping
-  public List<ProductResponse> findAll() {
-    return service.findAll().stream().map(mapper::toResponse).toList();
+  public PageResult<ProductResponse> findAll(
+      @RequestParam(defaultValue = "0") int page,
+      @RequestParam(defaultValue = "20") int size,
+      @RequestParam(defaultValue = "id") String sort,
+      @RequestParam(defaultValue = "asc") String direction) {
+    PageQuery query = PageQuery.of(page, size, sort, direction);
+    return service.findAll(query).map(mapper::toResponse);
   }
 
   @GetMapping("/{id}")

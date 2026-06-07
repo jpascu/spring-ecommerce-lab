@@ -101,8 +101,8 @@
     <a href="#stack">Stack &amp; arquitectura</a>
     <div class="group">Fases</div>
     <a href="#fase0">Fase 0 — Setup ✅</a>
-    <a href="#fase1">Fase 1 — CRUD</a>
-    <a href="#fase2">Fase 2 — Servicios</a>
+    <a href="#fase1">Fase 1 — CRUD ✅</a>
+    <a href="#fase2">Fase 2 — Buenas prácticas ✅</a>
     <a href="#fase3">Fase 3 — Patrones</a>
     <a href="#fase4">Fase 4 — Testing</a>
     <a href="#fase5">Fase 5 — Librerías</a>
@@ -365,8 +365,83 @@ curl http://localhost:8080/api/products</pre>
     </section>
 
     <section id="fase2">
-      <h2>Fase 2 — Servicios &amp; buenas prácticas <span class="badge todo">pendiente</span></h2>
-      <p>Separación de capas, manejo global de errores (<code>@ControllerAdvice</code>), paginación y logging estructurado.</p>
+      <h2>Fase 2 — Buenas prácticas <span class="badge done">hecho</span></h2>
+      <p>Tres mejoras transversales sobre el CRUD: <strong>manejo global de errores</strong>, <strong>paginación/ordenación</strong>
+      y <strong>logging con correlation id (traceId)</strong>. Todo respetando la arquitectura hexagonal.</p>
+
+      <h3>1. Manejo global de errores</h3>
+      <p>Centralizamos el tratamiento de excepciones en un <code>@RestControllerAdvice</code>, evitando try/catch repetidos en los
+      controllers y devolviendo siempre el mismo formato de error (<code>ApiError</code>).</p>
+      <table>
+        <tr><th>Excepción</th><th>HTTP</th><th>Detalle</th></tr>
+        <tr><td><code>ProductNotFoundException</code></td><td>404</td><td>Recurso inexistente</td></tr>
+        <tr><td><code>MethodArgumentNotValidException</code></td><td>400</td><td>Validación fallida (lista <code>fieldErrors</code>)</td></tr>
+        <tr><td><code>Exception</code> (fallback)</td><td>500</td><td>Error no controlado; se loguea, no se filtra al cliente</td></tr>
+      </table>
+      <pre><span class="k">@ExceptionHandler</span>(MethodArgumentNotValidException.class)
+<span class="k">public</span> ResponseEntity&lt;ApiError&gt; handleValidation(MethodArgumentNotValidException ex, HttpServletRequest req) {
+  List&lt;FieldErrorItem&gt; errors = ex.getBindingResult().getFieldErrors().stream()
+      .map(fe -> <span class="k">new</span> FieldErrorItem(fe.getField(), fe.getDefaultMessage()))
+      .toList();
+  <span class="k">return</span> build(HttpStatus.<span class="k">BAD_REQUEST</span>, <span class="s">"Error de validacion"</span>, req, errors);
+}</pre>
+      <p>Ejemplo de respuesta 400:</p>
+      <pre>{
+  <span class="s">"timestamp"</span>: <span class="s">"2026-06-07T09:30:00Z"</span>,
+  <span class="s">"status"</span>: 400,
+  <span class="s">"error"</span>: <span class="s">"Bad Request"</span>,
+  <span class="s">"message"</span>: <span class="s">"Error de validacion"</span>,
+  <span class="s">"path"</span>: <span class="s">"/api/products"</span>,
+  <span class="s">"traceId"</span>: <span class="s">"a1b2c3d4"</span>,
+  <span class="s">"fieldErrors"</span>: [ { <span class="s">"field"</span>: <span class="s">"name"</span>, <span class="s">"message"</span>: <span class="s">"el nombre es obligatorio"</span> } ]
+}</pre>
+      <div class="note"><strong>Alternativa estándar:</strong> Spring 6 trae <code>ProblemDetail</code> (RFC 7807). Aquí usamos un
+      <code>record ApiError</code> propio por claridad didáctica, pero el patrón es el mismo.</div>
+
+      <h3>2. Paginación y ordenación (sin acoplar el dominio)</h3>
+      <p>Para no filtrar <code>Pageable</code>/<code>Page</code> de Spring hacia los puertos, definimos abstracciones propias en
+      la capa de aplicación: <code>PageQuery</code> (entrada) y <code>PageResult&lt;T&gt;</code> (salida). El adaptador JPA las
+      traduce a <code>PageRequest</code>/<code>Page</code>.</p>
+      <pre><span class="c">// El controller recibe los parámetros y construye un PageQuery</span>
+<span class="k">@GetMapping</span>
+<span class="k">public</span> PageResult&lt;ProductResponse&gt; findAll(
+    <span class="k">@RequestParam</span>(defaultValue=<span class="s">"0"</span>) <span class="k">int</span> page,
+    <span class="k">@RequestParam</span>(defaultValue=<span class="s">"20"</span>) <span class="k">int</span> size,
+    <span class="k">@RequestParam</span>(defaultValue=<span class="s">"id"</span>) String sort,
+    <span class="k">@RequestParam</span>(defaultValue=<span class="s">"asc"</span>) String direction) {
+  <span class="k">return</span> service.findAll(PageQuery.of(page, size, sort, direction)).map(mapper::toResponse);
+}</pre>
+      <p>Petición: <code>GET /api/products?page=0&amp;size=5&amp;sort=name&amp;direction=desc</code>. Respuesta:</p>
+      <pre>{ <span class="s">"content"</span>: [ ... ], <span class="s">"page"</span>: 0, <span class="s">"size"</span>: 5, <span class="s">"totalElements"</span>: 12, <span class="s">"totalPages"</span>: 3 }</pre>
+      <div class="tip"><code>PageQuery.of(...)</code> <strong>sanea</strong> la entrada (page&gt;=0, size acotado a 100, sort por
+      defecto). Nunca confíes en los parámetros que llegan del exterior. <code>PageResult.map()</code> convierte el contenido a
+      DTO conservando los metadatos de paginación.</div>
+
+      <h3>3. Logging con correlation id (traceId)</h3>
+      <p>Un <code>OncePerRequestFilter</code> (<code>CorrelationIdFilter</code>) asigna un <strong>traceId</strong> a cada petición
+      y lo mete en el <strong>MDC</strong> de SLF4J. Todas las líneas de log de esa petición comparten ese id, y lo devolvemos en
+      la cabecera <code>X-Request-Id</code> y en el cuerpo de error.</p>
+      <pre><span class="k">@Component</span>
+<span class="k">@Order</span>(Ordered.<span class="k">HIGHEST_PRECEDENCE</span>)
+<span class="k">public class</span> CorrelationIdFilter <span class="k">extends</span> OncePerRequestFilter {
+  <span class="k">protected void</span> doFilterInternal(req, res, chain) {
+    String traceId = Optional.ofNullable(req.getHeader(<span class="s">"X-Request-Id"</span>))
+        .orElse(UUID.randomUUID().toString().substring(0, 8));
+    MDC.put(<span class="s">"traceId"</span>, traceId);
+    res.setHeader(<span class="s">"X-Request-Id"</span>, traceId);
+    <span class="k">try</span> { chain.doFilter(req, res); } <span class="k">finally</span> { MDC.remove(<span class="s">"traceId"</span>); }
+  }
+}</pre>
+      <p>El patrón de log (en <code>logback-spring.xml</code>) incluye <code>%X{traceId}</code>:</p>
+      <pre>2026-06-07 11:17:31.946 INFO  [a1b2c3d4] c.l.e.a.s.ProductServiceImpl : Producto creado id=4 name='Webcam'</pre>
+      <div class="tip"><strong>Relación con riesgos:</strong> esto es exactamente el mecanismo de un <code>decisionTraceId</code>:
+      propagar un identificador por toda la traza para correlacionar logs entre servicios. Aquí lo aprendes en pequeño.</div>
+
+      <h3>Cómo se prueba la Fase 2</h3>
+      <pre>mvn verify   <span class="c"># ProductControllerIT cubre paginación y formato de error</span></pre>
+      <pre><span class="c"># manual: enviar tu propio traceId y verlo reflejado en la respuesta</span>
+curl -i -H <span class="s">"X-Request-Id: mi-trace-123"</span> http://localhost:8080/api/products
+<span class="c"># la respuesta incluye la cabecera X-Request-Id: mi-trace-123</span></pre>
     </section>
 
     <section id="fase3">
@@ -692,17 +767,19 @@ curl http://localhost:8080/api/products</pre>
         <tr><td><code>@Valid</code> + <code>@NotBlank</code>/<code>@NotNull</code>/<code>@PositiveOrZero</code></td><td>1</td><td>Validación de entrada (Bean Validation)</td></tr>
         <tr><td><code>@Service</code> / <code>@Component</code></td><td>1</td><td>Declaran beans de Spring</td></tr>
         <tr><td><code>@Transactional</code></td><td>1</td><td>Demarca transacciones</td></tr>
-        <tr><td><code>@RestControllerAdvice</code> / <code>@ExceptionHandler</code></td><td>1</td><td>Traduce excepciones a respuestas HTTP</td></tr>
         <tr><td><code>@Profile</code></td><td>1</td><td>Activa beans solo en ciertos perfiles (ej. dev)</td></tr>
         <tr><td><code>@EnableScheduling</code> / <code>@Scheduled</code></td><td>1+</td><td>Adaptador de entrada por tiempo (tareas programadas)</td></tr>
         <tr><td><code>@KafkaListener</code> / <code>ApplicationRunner</code></td><td>1+</td><td>Adaptadores de entrada (mensajería / CLI)</td></tr>
+        <tr><td><code>@RestControllerAdvice</code> / <code>@ExceptionHandler</code></td><td>2</td><td>Manejo global de errores (ApiError)</td></tr>
+        <tr><td><code>@RequestParam</code></td><td>2</td><td>Parámetros de query (paginación)</td></tr>
+        <tr><td><code>OncePerRequestFilter</code> + MDC</td><td>2</td><td>traceId por petición (correlation id)</td></tr>
         <tr><td><code>@Testcontainers</code> / <code>@Container</code></td><td>4</td><td>Gestiona el ciclo de vida de contenedores</td></tr>
         <tr><td><code>@ServiceConnection</code></td><td>4</td><td>Conecta Spring al contenedor automáticamente</td></tr>
       </table>
     </section>
 
     <footer>
-      <p>spring-ecommerce-lab — guía generada de forma incremental. Última fase documentada: <strong>Fase 1</strong>.</p>
+      <p>spring-ecommerce-lab — guía generada de forma incremental. Última fase documentada: <strong>Fase 2</strong>.</p>
     </footer>
   </main>
 </div>

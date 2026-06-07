@@ -39,7 +39,7 @@ spring-ecommerce-lab/
 
 - [x] **Fase 0 — Setup**: estructura, Maven, Spring Boot arrancable, Actuator.
 - [x] **Fase 1 — CRUD (hexagonal)**: arquitectura puertos/adaptadores, JPA + H2, DTOs + MapStruct, validación, CRUD REST.
-- [ ] **Fase 2 — Servicios y buenas prácticas**: capas, `@ControllerAdvice`, paginación, logging.
+- [x] **Fase 2 — Buenas prácticas**: manejo global de errores (`ApiError`), paginación/ordenación, logging con `traceId`.
 - [ ] **Fase 3 — Patrones de diseño**: Strategy, Factory, Builder, Template Method.
 - [ ] **Fase 4 — Testing**: JUnit 5, Mockito, AssertJ, slices (`@WebMvcTest`, `@DataJpaTest`), Testcontainers.
 - [ ] **Fase 5 — Librerías Spring**: OpenAPI/Swagger, Actuator, Resilience4j, Cache, Security + JWT.
@@ -69,7 +69,10 @@ mvn verify   # + tests de integración (*IT, Failsafe): CRUD end-to-end
 
 ## Endpoints principales
 
-- `GET/POST /api/products`, `GET/PUT/DELETE /api/products/{id}` — CRUD de productos
+- `GET /api/products?page=0&size=20&sort=name&direction=asc` — listado **paginado** (`PageResult`)
+- `POST /api/products`, `GET/PUT/DELETE /api/products/{id}` — CRUD de productos
+- Errores con formato estándar `ApiError` (incluye `traceId` y `fieldErrors` en validación)
+- Cabecera `X-Request-Id` (correlation id) en cada respuesta
 - Consola H2: http://localhost:8080/h2-console (JDBC `jdbc:h2:mem:shopdb`, user `sa`)
 
 ## Probar con Postman

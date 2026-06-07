@@ -1,5 +1,7 @@
 package com.lab.ecommerce.application.port.in;
 
+import com.lab.ecommerce.application.common.PageQuery;
+import com.lab.ecommerce.application.common.PageResult;
 import com.lab.ecommerce.domain.model.Product;
 import java.util.List;
 
@@ -13,6 +15,8 @@ import java.util.List;
 public interface ProductService {
 
   List<Product> findAll();
+
+  PageResult<Product> findAll(PageQuery query);
 
   Product findById(Long id);
 

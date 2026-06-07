@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+
+  <!-- Reutilizamos los valores por defecto de Spring Boot (niveles, conversores de color...) -->
+  <include resource="org/springframework/boot/logging/logback/defaults.xml"/>
+
+  <!--
+    Patron de consola que incluye el traceId del MDC (puesto por CorrelationIdFilter).
+    Si no hay traceId (ej. tareas programadas), se muestra "-".
+  -->
+  <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+    <encoder>
+      <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} %clr(%5p) [%clr(%X{traceId:--}){magenta}] %clr(%-40.40logger{39}){cyan} : %m%n</pattern>
+    </encoder>
+  </appender>
+
+  <root level="INFO">
+    <appender-ref ref="CONSOLE"/>
+  </root>
+
+</configuration>
