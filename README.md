@@ -71,3 +71,13 @@ mvn verify   # + tests de integración (*IT, Failsafe): CRUD end-to-end
 
 - `GET/POST /api/products`, `GET/PUT/DELETE /api/products/{id}` — CRUD de productos
 - Consola H2: http://localhost:8080/h2-console (JDBC `jdbc:h2:mem:shopdb`, user `sa`)
+
+## Probar con Postman
+
+Importa `postman/spring-ecommerce-lab.postman_collection.json`. Incluye Health/Ping, CRUD de
+productos (guarda el `id` creado en la variable `{{productId}}`) y casos de error (400/404).
+Variable `{{baseUrl}}` por defecto `http://localhost:8080`. Puedes lanzarla entera con el
+Collection Runner.
+
+> Al crear/actualizar un producto, el adaptador de salida `LakeProductEventPublisher` emite un
+> evento (simulado por log `[LAKE] ...`) — ejemplo de adaptador hexagonal hacia un *data lake*.

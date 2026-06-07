@@ -110,6 +110,7 @@
     <a href="#fase7">Fase 7 — Angular</a>
     <a href="#fase8">Fase 8 — Calidad/CI</a>
     <div class="group">Especiales</div>
+    <a href="#adaptadores">🔌 Adaptadores (más allá de HTTP/JPA)</a>
     <a href="#testcontainers">🐳 Testcontainers (deep dive)</a>
     <a href="#anotaciones">Glosario de anotaciones</a>
   </nav>
@@ -397,6 +398,85 @@ curl http://localhost:8080/api/products</pre>
     <section id="fase8">
       <h2>Fase 8 — Calidad &amp; CI <span class="badge todo">pendiente</span></h2>
       <p>Docker, docker-compose y GitHub Actions para integración continua.</p>
+    </section>
+
+    <!-- ============================ ADAPTADORES ============================ -->
+    <section id="adaptadores">
+      <h2>🔌 Adaptadores más allá de HTTP/JPA</h2>
+      <p>En hexagonal, <strong>cualquier cosa que entra o sale</strong> de la aplicación es un adaptador conectado a un puerto.
+      HTTP y JPA son solo los dos más típicos. La gracia es que el dominio y los casos de uso <strong>no cambian</strong> aunque
+      cambies o añadas adaptadores.</p>
+
+      <h3>Catálogo de adaptadores frecuentes</h3>
+      <table>
+        <tr><th>Dirección</th><th>Adaptador</th><th>Tecnología típica</th><th>Mecanismo Spring</th></tr>
+        <tr><td>Entrada (driving)</td><td>REST</td><td>HTTP/JSON</td><td><code>@RestController</code></td></tr>
+        <tr><td>Entrada</td><td>Consumidor de mensajes</td><td>Kafka / SQS / RabbitMQ</td><td><code>@KafkaListener</code>, <code>@SqsListener</code></td></tr>
+        <tr><td>Entrada</td><td>Tarea programada</td><td>Cron</td><td><code>@Scheduled</code></td></tr>
+        <tr><td>Entrada</td><td>CLI / arranque</td><td>línea de comandos</td><td><code>CommandLineRunner</code></td></tr>
+        <tr><td>Entrada</td><td>gRPC / GraphQL</td><td>RPC binario / GraphQL</td><td>controllers específicos</td></tr>
+        <tr><td>Salida (driven)</td><td>Persistencia</td><td>JPA / Mongo / DynamoDB</td><td>Repositorio + adapter</td></tr>
+        <tr><td>Salida</td><td>Publicación de eventos</td><td>Kafka / Kinesis / SNS</td><td>Producer + adapter</td></tr>
+        <tr><td>Salida</td><td>Data lake</td><td>S3 / Kinesis Firehose</td><td>SDK AWS + adapter</td></tr>
+        <tr><td>Salida</td><td>Cliente de API externa</td><td>HTTP (bureau, Schufa...)</td><td><code>RestClient</code>/<code>WebClient</code> + adapter</td></tr>
+        <tr><td>Salida</td><td>Caché</td><td>Redis</td><td>adapter sobre el puerto</td></tr>
+        <tr><td>Salida</td><td>Email / notificación</td><td>SMTP</td><td><code>JavaMailSender</code> + adapter</td></tr>
+      </table>
+
+      <h3>Ejemplo implementado: enviar cada producto a un data lake</h3>
+      <p>Requisito: <em>"cada producto que se crea o modifica debe enviarse a un lake"</em>. En hexagonal esto NO se mete en el
+      controller ni en el repositorio: se modela como un <strong>puerto de salida</strong> nuevo y un <strong>adaptador</strong>.</p>
+
+      <h4>1. Evento de dominio (puro)</h4>
+      <pre><span class="c">// domain/event/ProductChangedEvent.java</span>
+<span class="k">public record</span> ProductChangedEvent(Product product, ProductChangeType type, Instant occurredAt) {
+  <span class="k">public static</span> ProductChangedEvent of(Product p, ProductChangeType t) {
+    <span class="k">return new</span> ProductChangedEvent(p, t, Instant.now());
+  }
+}</pre>
+
+      <h4>2. Puerto de salida (la aplicación solo conoce esto)</h4>
+      <pre><span class="c">// application/port/out/ProductEventPublisherPort.java</span>
+<span class="k">public interface</span> ProductEventPublisherPort {
+  <span class="k">void</span> publish(ProductChangedEvent event);
+}</pre>
+
+      <h4>3. El caso de uso lo usa sin saber qué hay detrás</h4>
+      <pre><span class="c">// application/service/ProductServiceImpl.java</span>
+<span class="k">public</span> Product create(Product product) {
+  Product saved = repository.save(product);
+  eventPublisher.publish(ProductChangedEvent.of(saved, ProductChangeType.<span class="k">CREATED</span>));
+  <span class="k">return</span> saved;
+}</pre>
+
+      <h4>4. El adaptador concreto (aquí se simula con log; en real sería S3/Kinesis)</h4>
+      <pre><span class="c">// infrastructure/adapter/out/lake/LakeProductEventPublisher.java</span>
+<span class="k">@Component</span>
+<span class="k">public class</span> LakeProductEventPublisher <span class="k">implements</span> ProductEventPublisherPort {
+  <span class="k">public void</span> publish(ProductChangedEvent event) {
+    <span class="c">// real: serializar a JSON/Parquet y PutObject a S3 / putRecord a Kinesis</span>
+    log.info(<span class="s">"[LAKE] {} producto id={}"</span>, event.type(), event.product().getId());
+  }
+}</pre>
+      <div class="tip">Para cambiar de "lake" a Kafka, <strong>solo creas otro adaptador</strong> que implemente el mismo puerto.
+      El dominio, el servicio y el controller no se tocan. Eso es exactamente lo que aporta hexagonal.</div>
+
+      <h3>¿Cómo elegir entre varios adaptadores del mismo puerto?</h3>
+      <p>Si tienes dos implementaciones (ej. lake y Kafka) Spring necesita saber cuál inyectar:</p>
+      <ul>
+        <li><strong><code>@Profile("lake")</code> / <code>@Profile("kafka")</code></strong>: activas uno u otro por configuración.</li>
+        <li><strong><code>@Primary</code></strong>: marcas el por defecto.</li>
+        <li><strong>Composite</strong>: un adaptador que agrupa varios y publica en todos a la vez.</li>
+      </ul>
+
+      <div class="warn"><strong>Cuidado con las transacciones (importante para el lake):</strong> publicar dentro de la transacción
+      tiene un riesgo: si la transacción hace <em>rollback</em> después, ya habrás enviado un evento de algo que no se guardó.
+      Patrones recomendados en producción:
+      <ul>
+        <li><strong>Eventos tras commit</strong>: <code>@TransactionalEventListener(phase = AFTER_COMMIT)</code>.</li>
+        <li><strong>Transactional Outbox</strong>: guardas el evento en una tabla dentro de la misma transacción y un proceso aparte lo envía al lake. Garantiza consistencia (lo veremos en la Fase 6).</li>
+      </ul>
+      En este ejemplo publicamos de forma síncrona por simplicidad didáctica.</div>
     </section>
 
     <!-- ============================ TESTCONTAINERS ============================ -->

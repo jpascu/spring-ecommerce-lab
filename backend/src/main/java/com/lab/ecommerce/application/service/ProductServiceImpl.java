@@ -1,7 +1,10 @@
 package com.lab.ecommerce.application.service;
 
 import com.lab.ecommerce.application.port.in.ProductService;
+import com.lab.ecommerce.application.port.out.ProductEventPublisherPort;
 import com.lab.ecommerce.application.port.out.ProductRepositoryPort;
+import com.lab.ecommerce.domain.event.ProductChangeType;
+import com.lab.ecommerce.domain.event.ProductChangedEvent;
 import com.lab.ecommerce.domain.exception.ProductNotFoundException;
 import com.lab.ecommerce.domain.model.Product;
 import java.util.List;
@@ -21,6 +24,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class ProductServiceImpl implements ProductService {
 
   private final ProductRepositoryPort repository;
+  private final ProductEventPublisherPort eventPublisher;
 
   @Override
   public List<Product> findAll() {
@@ -37,7 +41,9 @@ public class ProductServiceImpl implements ProductService {
   @Transactional
   public Product create(Product product) {
     product.setId(null);
-    return repository.save(product);
+    Product saved = repository.save(product);
+    eventPublisher.publish(ProductChangedEvent.of(saved, ProductChangeType.CREATED));
+    return saved;
   }
 
   @Override
@@ -50,7 +56,9 @@ public class ProductServiceImpl implements ProductService {
     existing.setPrice(changes.getPrice());
     existing.setStock(changes.getStock());
     existing.setCategory(changes.getCategory());
-    return repository.save(existing);
+    Product saved = repository.save(existing);
+    eventPublisher.publish(ProductChangedEvent.of(saved, ProductChangeType.UPDATED));
+    return saved;
   }
 
   @Override
