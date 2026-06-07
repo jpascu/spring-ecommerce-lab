@@ -461,6 +461,59 @@ curl http://localhost:8080/api/products</pre>
       <div class="tip">Para cambiar de "lake" a Kafka, <strong>solo creas otro adaptador</strong> que implemente el mismo puerto.
       El dominio, el servicio y el controller no se tocan. Eso es exactamente lo que aporta hexagonal.</div>
 
+      <h3>Ejemplo implementado: adaptador de ENTRADA con tarea programada</h3>
+      <p>Un adaptador de entrada (driving) inicia la ejecución de un caso de uso. No tiene por qué ser HTTP: aquí el disparador
+      es el <strong>reloj</strong>. Implementamos un monitor de stock bajo.</p>
+
+      <h4>1. Caso de uso (puerto de entrada)</h4>
+      <pre><span class="c">// application/port/in/StockMonitorUseCase.java</span>
+<span class="k">public interface</span> StockMonitorUseCase {
+  List&lt;Product&gt; findLowStock(<span class="k">int</span> threshold);
+}</pre>
+      <div class="note"><strong>ISP (Interface Segregation):</strong> creamos un puerto aparte en vez de inflar
+      <code>ProductService</code>. Interfaces pequeñas y cohesionadas.</div>
+
+      <h4>2. El adaptador de entrada (scheduler)</h4>
+      <pre><span class="c">// infrastructure/adapter/in/scheduler/LowStockScheduler.java</span>
+<span class="k">@Component</span>
+<span class="k">@Profile</span>(<span class="s">"dev"</span>)
+<span class="k">public class</span> LowStockScheduler {
+  <span class="k">private final</span> StockMonitorUseCase stockMonitor;
+
+  <span class="k">@Scheduled</span>(initialDelayString = <span class="s">"${app.low-stock.initial-delay-ms:15000}"</span>,
+             fixedDelayString = <span class="s">"${app.low-stock.interval-ms:60000}"</span>)
+  <span class="k">public void</span> checkLowStock() {
+    stockMonitor.findLowStock(threshold)
+        .forEach(p -> log.warn(<span class="s">"[STOCK] BAJO id={} stock={}"</span>, p.getId(), p.getStock()));
+  }
+}</pre>
+      <p>Requiere <code>@EnableScheduling</code> en la clase de arranque. Con el perfil <code>dev</code>, al ejecutar verás cada
+      minuto un log <code>[STOCK] ...</code>. La <strong>lógica</strong> (qué es "stock bajo") está en la aplicación; el adaptador
+      solo decide <em>cuándo</em> preguntar y <em>qué</em> hacer con el resultado.</p>
+
+      <h3>Otros adaptadores de entrada (esquema)</h3>
+      <h4>Consumidor de mensajes (Kafka/SQS)</h4>
+      <pre><span class="k">@Component</span>
+<span class="k">public class</span> ProductImportListener {
+  <span class="k">private final</span> ProductService productService;  <span class="c">// mismo puerto de entrada</span>
+
+  <span class="k">@KafkaListener</span>(topics = <span class="s">"product-imports"</span>)
+  <span class="k">public void</span> onMessage(ProductImportMessage msg) {
+    productService.create(toDomain(msg));   <span class="c">// reutiliza el caso de uso</span>
+  }
+}</pre>
+
+      <h4>Importador por línea de comandos / fichero</h4>
+      <pre><span class="k">@Component</span>
+<span class="k">public class</span> CsvImportRunner <span class="k">implements</span> ApplicationRunner {
+  <span class="k">private final</span> ProductService productService;
+  <span class="k">public void</span> run(ApplicationArguments args) {
+    <span class="c">// lee un CSV y por cada linea: productService.create(...)</span>
+  }
+}</pre>
+      <div class="tip"><strong>Patrón común:</strong> todos los adaptadores de entrada (REST, scheduler, listener, CLI) acaban
+      llamando al <em>mismo</em> puerto de entrada. Por eso la lógica se escribe una vez y se reutiliza desde cualquier disparador.</div>
+
       <h3>¿Cómo elegir entre varios adaptadores del mismo puerto?</h3>
       <p>Si tienes dos implementaciones (ej. lake y Kafka) Spring necesita saber cuál inyectar:</p>
       <ul>
@@ -641,6 +694,8 @@ curl http://localhost:8080/api/products</pre>
         <tr><td><code>@Transactional</code></td><td>1</td><td>Demarca transacciones</td></tr>
         <tr><td><code>@RestControllerAdvice</code> / <code>@ExceptionHandler</code></td><td>1</td><td>Traduce excepciones a respuestas HTTP</td></tr>
         <tr><td><code>@Profile</code></td><td>1</td><td>Activa beans solo en ciertos perfiles (ej. dev)</td></tr>
+        <tr><td><code>@EnableScheduling</code> / <code>@Scheduled</code></td><td>1+</td><td>Adaptador de entrada por tiempo (tareas programadas)</td></tr>
+        <tr><td><code>@KafkaListener</code> / <code>ApplicationRunner</code></td><td>1+</td><td>Adaptadores de entrada (mensajería / CLI)</td></tr>
         <tr><td><code>@Testcontainers</code> / <code>@Container</code></td><td>4</td><td>Gestiona el ciclo de vida de contenedores</td></tr>
         <tr><td><code>@ServiceConnection</code></td><td>4</td><td>Conecta Spring al contenedor automáticamente</td></tr>
       </table>
