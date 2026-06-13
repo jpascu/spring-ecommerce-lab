@@ -2,9 +2,15 @@ package com.lab.ecommerce.infrastructure.adapter.in.web;
 
 import com.lab.ecommerce.application.common.PageQuery;
 import com.lab.ecommerce.application.common.PageResult;
+import com.lab.ecommerce.application.port.in.PricingUseCase;
 import com.lab.ecommerce.application.port.in.ProductService;
+import com.lab.ecommerce.domain.pricing.CustomerTier;
+import com.lab.ecommerce.domain.pricing.PriceQuote;
+import com.lab.ecommerce.domain.pricing.PricingContext;
+import com.lab.ecommerce.infrastructure.adapter.in.web.dto.PriceQuoteResponse;
 import com.lab.ecommerce.infrastructure.adapter.in.web.dto.ProductRequest;
 import com.lab.ecommerce.infrastructure.adapter.in.web.dto.ProductResponse;
+import com.lab.ecommerce.infrastructure.adapter.in.web.dto.QuoteRequest;
 import com.lab.ecommerce.infrastructure.adapter.in.web.mapper.ProductWebMapper;
 import jakarta.validation.Valid;
 import java.net.URI;
@@ -33,6 +39,7 @@ import org.springframework.web.util.UriComponentsBuilder;
 public class ProductController {
 
   private final ProductService service;
+  private final PricingUseCase pricing;
   private final ProductWebMapper mapper;
 
   @GetMapping
@@ -69,5 +76,26 @@ public class ProductController {
   @ResponseStatus(HttpStatus.NO_CONTENT)
   public void delete(@PathVariable Long id) {
     service.delete(id);
+  }
+
+  @PostMapping("/{id}/quote")
+  public PriceQuoteResponse quote(@PathVariable Long id, @Valid @RequestBody QuoteRequest request) {
+    PricingContext context = new PricingContext(
+        parseTier(request.tier()), request.quantity(), request.couponCode());
+    PriceQuote quote = pricing.quote(id, context);
+    return new PriceQuoteResponse(
+        quote.getProductId(), quote.getUnitPrice(), quote.getQuantity(),
+        quote.getSubtotal(), quote.getDiscount(), quote.getTotal(), quote.getAppliedStrategy());
+  }
+
+  private CustomerTier parseTier(String tier) {
+    if (tier == null || tier.isBlank()) {
+      return CustomerTier.STANDARD;
+    }
+    try {
+      return CustomerTier.valueOf(tier.trim().toUpperCase());
+    } catch (IllegalArgumentException ex) {
+      throw new IllegalArgumentException("tier invalido: " + tier + " (use STANDARD, PREMIUM o VIP)");
+    }
   }
 }

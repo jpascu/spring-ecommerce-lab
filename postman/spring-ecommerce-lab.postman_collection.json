@@ -123,6 +123,31 @@
           }
         },
         {
+          "name": "Presupuesto (quote)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const q = pm.response.json();",
+                  "pm.test('tiene total y estrategia', () => { pm.expect(q).to.have.property('total'); pm.expect(q).to.have.property('appliedStrategy'); });"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tier\": \"VIP\",\n  \"quantity\": 60,\n  \"couponCode\": \"SAVE20\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/products/{{productId}}/quote", "host": ["{{baseUrl}}"], "path": ["api", "products", "{{productId}}", "quote"] }
+          }
+        },
+        {
           "name": "Borrar producto",
           "event": [
             {

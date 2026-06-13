@@ -43,6 +43,15 @@ public class WebExceptionHandler {
   }
 
   /**
+   * Argumentos de negocio inválidos (ej. tier desconocido): 400.
+   */
+  @ExceptionHandler(IllegalArgumentException.class)
+  public ResponseEntity<ApiError> handleIllegalArgument(IllegalArgumentException ex,
+      HttpServletRequest request) {
+    return build(HttpStatus.BAD_REQUEST, ex.getMessage(), request, List.of());
+  }
+
+  /**
    * Red de seguridad: cualquier error no controlado se traduce a 500 sin filtrar
    * detalles internos al cliente (pero se registra en el log con el traceId).
    */

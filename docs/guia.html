@@ -104,7 +104,7 @@
     <a href="#fase0">Fase 0 — Setup ✅</a>
     <a href="#fase1">Fase 1 — CRUD ✅</a>
     <a href="#fase2">Fase 2 — Buenas prácticas ✅</a>
-    <a href="#fase3">Fase 3 — Patrones</a>
+    <a href="#fase3">Fase 3 — Patrones ✅</a>
     <a href="#fase4">Fase 4 — Testing</a>
     <a href="#fase5">Fase 5 — Librerías</a>
     <a href="#fase6">Fase 6 — Async/Eventos</a>
@@ -587,8 +587,96 @@ curl -i -H <span class="s">"X-Request-Id: mi-trace-123"</span> http://localhost:
     </section>
 
     <section id="fase3">
-      <h2>Fase 3 — Patrones de diseño <span class="badge todo">pendiente</span></h2>
-      <p>Strategy, Factory, Builder y Template Method aplicados a casos reales (muy relevante para motores de reglas tipo riesgos).</p>
+      <h2>Fase 3 — Patrones de diseño <span class="badge done">hecho</span></h2>
+      <p>Implementamos un <strong>motor de descuentos</strong> que calcula el precio de un producto según el cliente, la cantidad
+      y posibles cupones. Es el caso ideal para combinar cuatro patrones clásicos: <strong>Strategy</strong>, <strong>Template
+      Method</strong>, <strong>Factory</strong> y <strong>Builder</strong>; y un caso muy cercano a un motor de reglas de riesgos.</p>
+
+      <h3>El caso de uso</h3>
+      <p>Endpoint <code>POST /api/products/{id}/quote</code> con un cuerpo como:</p>
+      <pre>{ <span class="s">"tier"</span>: <span class="s">"VIP"</span>, <span class="s">"quantity"</span>: 2, <span class="s">"couponCode"</span>: <span class="s">"SAVE10"</span> }</pre>
+      <p>Devuelve el presupuesto calculado:</p>
+      <pre>{ <span class="s">"productId"</span>: 4, <span class="s">"unitPrice"</span>: 100.00, <span class="s">"quantity"</span>: 2,
+  <span class="s">"subtotal"</span>: 200.00, <span class="s">"discount"</span>: 20.00, <span class="s">"total"</span>: 180.00, <span class="s">"appliedStrategy"</span>: <span class="s">"COUPON"</span> }</pre>
+
+      <h3>1. Strategy — algoritmos de descuento intercambiables</h3>
+      <p>Cada regla de descuento es una clase que implementa <code>DiscountStrategy</code>. En lugar de un <code>if/else</code>
+      gigante, añadir un descuento nuevo es <strong>añadir una clase</strong> (principio abierto/cerrado).</p>
+      <pre><span class="k">public interface</span> DiscountStrategy {
+  <span class="k">boolean</span> supports(PricingContext context);
+  BigDecimal calculateDiscount(BigDecimal subtotal, PricingContext context);
+  String code();
+  <span class="k">default int</span> priority() { <span class="k">return</span> 0; }
+}</pre>
+      <table>
+        <tr><th>Estrategia</th><th>Aplica cuando</th><th>Descuento</th><th>Prioridad</th></tr>
+        <tr><td><code>CouponDiscountStrategy</code></td><td>cupón válido (SAVE10/SAVE20/HALF)</td><td>10% / 20% / 50%</td><td>30</td></tr>
+        <tr><td><code>VolumeDiscountStrategy</code></td><td>cantidad ≥ 10 (≥ 50)</td><td>5% (12%)</td><td>20</td></tr>
+        <tr><td><code>CustomerTierStrategy</code></td><td>tier PREMIUM / VIP</td><td>8% / 15%</td><td>10</td></tr>
+        <tr><td><code>NoDiscountStrategy</code></td><td>siempre (fallback)</td><td>0%</td><td>mínima</td></tr>
+      </table>
+
+      <h3>2. Template Method — esqueleto común del cálculo</h3>
+      <p><code>AbstractDiscountStrategy</code> fija los pasos comunes en un método <code>final</code> (saneado, tope máximo del
+      70%, redondeo a 2 decimales) y deja un único hueco para la subclase: <code>doCalculate()</code>. Así ninguna estrategia
+      puede "olvidarse" del tope o del redondeo.</p>
+      <pre><span class="k">public final</span> BigDecimal calculateDiscount(BigDecimal subtotal, PricingContext ctx) {
+  <span class="k">if</span> (subtotal == <span class="k">null</span> || subtotal.signum() &lt;= 0) <span class="k">return</span> ZERO;
+  BigDecimal raw = doCalculate(subtotal, ctx);          <span class="c">// paso variable (subclase)</span>
+  BigDecimal cap = subtotal.multiply(<span class="s">"0.70"</span>);          <span class="c">// tope común</span>
+  <span class="k">return</span> raw.min(cap).max(ZERO).setScale(2, HALF_UP);   <span class="c">// invariantes garantizados</span>
+}
+<span class="k">protected abstract</span> BigDecimal doCalculate(BigDecimal subtotal, PricingContext ctx);</pre>
+
+      <h3>3. Factory — elegir la estrategia adecuada</h3>
+      <p><code>DiscountStrategyFactory</code> recibe todas las estrategias y selecciona la <strong>aplicable de mayor
+      prioridad</strong>. El caso de uso no sabe nada de estrategias concretas: solo pide "dame la que toca".</p>
+      <pre><span class="k">public</span> DiscountStrategy select(PricingContext ctx) {
+  <span class="k">return</span> strategies.stream()           <span class="c">// ya ordenadas por prioridad desc</span>
+      .filter(s -> s.supports(ctx))
+      .findFirst()
+      .orElseThrow();                  <span class="c">// NoDiscount siempre soporta -> nunca falla</span>
+}</pre>
+      <div class="note"><strong>Wiring hexagonal:</strong> las estrategias y la factoría son <strong>dominio puro</strong> (sin
+      anotaciones de Spring). Es <code>PricingConfig</code> (en <code>infrastructure/config</code>) quien las declara como
+      <code>@Bean</code> e inyecta <code>List&lt;DiscountStrategy&gt;</code> en la factoría. Spring inyecta automáticamente
+      <em>todos</em> los beans de ese tipo en la lista.</div>
+      <pre><span class="k">@Bean</span>
+<span class="k">public</span> DiscountStrategyFactory discountStrategyFactory(List&lt;DiscountStrategy&gt; strategies) {
+  <span class="k">return new</span> DiscountStrategyFactory(strategies);  <span class="c">// Spring rellena la lista con los 4 beans</span>
+}</pre>
+
+      <h3>4. Builder — construir el resultado de forma legible</h3>
+      <p><code>PriceQuote</code> tiene 7 campos relacionados. Un constructor posicional sería ilegible y fácil de equivocar.
+      Lombok <code>@Builder</code> genera el patrón Builder, con una API fluida y autoexplicativa.</p>
+      <pre><span class="k">return</span> PriceQuote.builder()
+    .productId(productId)
+    .unitPrice(unitPrice)
+    .quantity(ctx.quantity())
+    .subtotal(subtotal)
+    .discount(discount)
+    .total(total)
+    .appliedStrategy(strategy.code())
+    .build();</pre>
+
+      <h3>Cómo encaja todo (flujo del caso de uso)</h3>
+      <pre>PricingService.quote(id, ctx):
+  1. productRepository.findById(id)            <span class="c"># puerto OUT (carga el producto)</span>
+  2. subtotal = precio x cantidad
+  3. strategy = factory.select(ctx)            <span class="c"># FACTORY elige STRATEGY</span>
+  4. discount = strategy.calculateDiscount(..) <span class="c"># TEMPLATE METHOD aplica reglas + tope</span>
+  5. return PriceQuote.builder()...build()     <span class="c"># BUILDER arma el resultado</span></pre>
+
+      <h3>Cómo se prueba la Fase 3</h3>
+      <pre>mvn verify   <span class="c"># DiscountEngineTest (7 tests PUROS, sin Spring) + PricingControllerIT</span></pre>
+      <pre><span class="c"># manual</span>
+curl -X POST http://localhost:8080/api/products/1/quote \
+  -H <span class="s">"Content-Type: application/json"</span> \
+  -d <span class="s">'{"tier":"VIP","quantity":60,"couponCode":"SAVE20"}'</span></pre>
+      <div class="tip"><strong>Relación con riesgos:</strong> un motor de decisión es exactamente esto. Cada <em>política</em>
+      (scoring, antifraude, límite) es una <strong>Strategy</strong>; un <strong>Template Method</strong> garantiza pasos
+      comunes (auditoría, validación); una <strong>Factory</strong> elige la política según el producto/canal; y un
+      <strong>Builder</strong> compone la decisión final. Y al ser dominio puro, todo se testea sin levantar infraestructura.</div>
     </section>
 
     <section id="fase4">
@@ -915,13 +1003,15 @@ curl -i -H <span class="s">"X-Request-Id: mi-trace-123"</span> http://localhost:
         <tr><td><code>@RestControllerAdvice</code> / <code>@ExceptionHandler</code></td><td>2</td><td>Manejo global de errores (ApiError)</td></tr>
         <tr><td><code>@RequestParam</code></td><td>2</td><td>Parámetros de query (paginación)</td></tr>
         <tr><td><code>OncePerRequestFilter</code> + MDC</td><td>2</td><td>traceId por petición (correlation id)</td></tr>
+        <tr><td><code>@Configuration</code> / <code>@Bean</code></td><td>3</td><td>Wiring manual de beans (estrategias + factory)</td></tr>
+        <tr><td>Inyección de <code>List&lt;T&gt;</code></td><td>3</td><td>Spring inyecta todos los beans de un tipo (Strategy)</td></tr>
         <tr><td><code>@Testcontainers</code> / <code>@Container</code></td><td>4</td><td>Gestiona el ciclo de vida de contenedores</td></tr>
         <tr><td><code>@ServiceConnection</code></td><td>4</td><td>Conecta Spring al contenedor automáticamente</td></tr>
       </table>
     </section>
 
     <footer>
-      <p>spring-ecommerce-lab — guía generada de forma incremental. Última fase documentada: <strong>Fase 2</strong>.</p>
+      <p>spring-ecommerce-lab — guía generada de forma incremental. Última fase documentada: <strong>Fase 3</strong>.</p>
     </footer>
   </main>
 </div>
