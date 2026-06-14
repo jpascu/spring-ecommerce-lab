@@ -802,7 +802,72 @@ mvn verify   <span class="c"># + integración: requiere Docker (Testcontainers l
       <code>OpenApiDocsIT</code>, que verifica que la spec se expone con nuestros metadatos.</div>
       <pre>mvn test -Dtest=OpenApiDocsIT   <span class="c"># o abre /swagger-ui.html con la app levantada</span></pre>
 
-      <h3>5b. Actuator avanzado <span class="badge todo">pendiente</span></h3>
+      <h3>5b. Actuator avanzado + métricas <span class="badge done">hecho</span></h3>
+      <p><strong>Actuator</strong> expone endpoints de <em>observabilidad</em> (salud, info, métricas, configuración...) listos
+      para producción. En esta subfase ampliamos los endpoints expuestos, añadimos un <strong>health check de negocio</strong>,
+      publicamos <strong>metadatos</strong> en <code>/actuator/info</code> y creamos una <strong>métrica personalizada</strong>
+      exportable a <strong>Prometheus</strong>.</p>
+
+      <h4>Endpoints expuestos</h4>
+      <table>
+        <tr><th>Endpoint</th><th>Para qué sirve</th></tr>
+        <tr><td><code>/actuator/health</code></td><td>Estado de la app y de cada <em>HealthIndicator</em> (BBDD, disco, stock...)</td></tr>
+        <tr><td><code>/actuator/info</code></td><td>Metadatos (nombre, versión, fase) definidos en <code>info.*</code></td></tr>
+        <tr><td><code>/actuator/metrics</code></td><td>Lista y detalle de métricas Micrometer</td></tr>
+        <tr><td><code>/actuator/prometheus</code></td><td>Métricas en formato Prometheus (para scraping)</td></tr>
+        <tr><td><code>/actuator/loggers</code></td><td>Ver y <strong>cambiar niveles de log en caliente</strong></td></tr>
+        <tr><td><code>/actuator/env</code>, <code>/beans</code>, <code>/mappings</code></td><td>Introspección de configuración, beans y rutas</td></tr>
+      </table>
+      <pre><span class="c"># application.yml</span>
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus,loggers,env,beans,mappings
+  endpoint:
+    health:
+      show-details: always
+  info:
+    env:
+      enabled: true</pre>
+      <div class="warn"><strong>Seguridad:</strong> en producción NO se exponen todos los endpoints abiertamente (env, beans y
+      loggers revelan información sensible o permiten cambios). Se protegen con Spring Security (subfase 5e) o se publican en un
+      puerto de gestión separado. Aquí los abrimos por didáctica.</div>
+
+      <h4>HealthIndicator de negocio</h4>
+      <p>Además de los health checks que trae Spring (BBDD, disco), podemos añadir los nuestros implementando
+      <code>HealthIndicator</code>. <code>StockHealthIndicator</code> aparece bajo la clave <code>stock</code> e informa cuántos
+      productos están sin stock:</p>
+      <pre><span class="k">@Component</span>(<span class="s">"stock"</span>)
+<span class="k">class</span> StockHealthIndicator <span class="k">implements</span> HealthIndicator {
+  <span class="k">public</span> Health health() {
+    List&lt;Product&gt; products = productService.findAll();
+    <span class="k">long</span> outOfStock = products.stream().filter(p -> p.getStock() &lt;= 0).count();
+    <span class="k">return</span> Health.up()
+        .withDetail(<span class="s">"totalProducts"</span>, products.size())
+        .withDetail(<span class="s">"outOfStock"</span>, outOfStock)
+        .build();
+  }
+}</pre>
+
+      <h4>Métrica personalizada (Micrometer)</h4>
+      <p><strong>Micrometer</strong> es la fachada de métricas de Spring (como SLF4J pero para métricas): tú instrumentas con su
+      API y él exporta a Prometheus, Datadog, CloudWatch, etc. Añadimos un contador que cuenta presupuestos por estrategia,
+      desde el adaptador web (donde sí es legítimo depender de Micrometer; el dominio sigue limpio):</p>
+      <pre>meterRegistry.counter(<span class="s">"ecommerce.quotes.calculated"</span>,
+    <span class="s">"strategy"</span>, quote.getAppliedStrategy()).increment();</pre>
+      <p>Se consulta en <code>/actuator/metrics/ecommerce.quotes.calculated</code> y, en formato Prometheus, como
+      <code>ecommerce_quotes_calculated_total{strategy="COUPON"}</code>. La <em>tag</em> <code>strategy</code> permite desglosar
+      por tipo de descuento en un dashboard (Grafana).</p>
+      <div class="tip"><strong>Verificación:</strong> <code>ActuatorIT</code> comprueba el indicador <code>stock</code> en
+      <code>/actuator/health</code>, los metadatos en <code>/actuator/info</code> y que la métrica se registra tras pedir un
+      presupuesto. <em>Nota técnica:</em> el endpoint <code>/actuator/prometheus</code> funciona en ejecución real, pero el test
+      verifica la métrica vía <code>/actuator/metrics</code> (más estable bajo MockMvc).</div>
+      <pre>mvn test -Dtest=ActuatorIT
+<span class="c"># o con la app arrancada:</span>
+curl http://localhost:8080/actuator/health
+curl http://localhost:8080/actuator/prometheus | grep ecommerce_quotes</pre>
+
       <h3>5c. Resilience4j <span class="badge todo">pendiente</span></h3>
       <h3>5d. Spring Cache <span class="badge todo">pendiente</span></h3>
       <h3>5e. Spring Security + JWT <span class="badge todo">pendiente</span></h3>
@@ -1129,11 +1194,13 @@ mvn verify   <span class="c"># + integración: requiere Docker (Testcontainers l
         <tr><td><code>@Testcontainers</code> / <code>@Container</code></td><td>4</td><td>Gestiona el ciclo de vida de contenedores</td></tr>
         <tr><td><code>@ServiceConnection</code></td><td>4</td><td>Conecta Spring al contenedor automáticamente</td></tr>
         <tr><td><code>@Tag</code> / <code>@Operation</code> / <code>@ApiResponse</code></td><td>5</td><td>Documentación OpenAPI de los endpoints</td></tr>
+        <tr><td><code>HealthIndicator</code></td><td>5</td><td>Health check de negocio en /actuator/health</td></tr>
+        <tr><td><code>MeterRegistry</code> (Micrometer)</td><td>5</td><td>Métricas personalizadas (counters, timers...)</td></tr>
       </table>
     </section>
 
     <footer>
-      <p>spring-ecommerce-lab — guía generada de forma incremental. Última fase documentada: <strong>Fase 5a (OpenAPI)</strong>.</p>
+      <p>spring-ecommerce-lab — guía generada de forma incremental. Última fase documentada: <strong>Fase 5b (Actuator + métricas)</strong>.</p>
     </footer>
   </main>
 </div>

@@ -36,12 +36,25 @@ springdoc:
   api-docs:
     path: /v3/api-docs              # especificacion JSON
 
-# Exponemos endpoints de Actuator para observabilidad (health, info, metrics)
+# Actuator: observabilidad (health, info, metricas, prometheus, loggers...)
 management:
   endpoints:
     web:
       exposure:
-        include: health,info,metrics
+        include: health,info,metrics,prometheus,loggers,env,beans,mappings
   endpoint:
     health:
-      show-details: always
+      show-details: always         # muestra el detalle de cada HealthIndicator
+  info:
+    env:
+      enabled: true                # permite publicar las propiedades info.* en /actuator/info
+  metrics:
+    tags:
+      application: ${spring.application.name}   # etiqueta comun para todas las metricas
+
+# Metadatos expuestos en /actuator/info
+info:
+  app:
+    name: spring-ecommerce-lab
+    description: Backend de aprendizaje Spring Boot (arquitectura hexagonal)
+    phase: "Fase 5 - Librerias Spring"

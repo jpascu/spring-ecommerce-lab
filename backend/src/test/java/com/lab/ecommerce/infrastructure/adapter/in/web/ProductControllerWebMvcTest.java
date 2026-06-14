@@ -14,6 +14,8 @@ import com.lab.ecommerce.domain.exception.ProductNotFoundException;
 import com.lab.ecommerce.domain.model.Product;
 import com.lab.ecommerce.infrastructure.adapter.in.web.dto.ProductResponse;
 import com.lab.ecommerce.infrastructure.adapter.in.web.mapper.ProductWebMapper;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.math.BigDecimal;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -42,6 +44,14 @@ class ProductControllerWebMvcTest {
 
   @MockBean
   private ProductWebMapper mapper;
+
+  @org.springframework.boot.test.context.TestConfiguration
+  static class MetricsTestConfig {
+    @org.springframework.context.annotation.Bean
+    MeterRegistry meterRegistry() {
+      return new SimpleMeterRegistry();
+    }
+  }
 
   @Test
   void getById_devuelve_json_del_producto() throws Exception {

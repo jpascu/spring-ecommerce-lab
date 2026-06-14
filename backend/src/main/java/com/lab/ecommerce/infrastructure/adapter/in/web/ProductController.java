@@ -15,6 +15,7 @@ import com.lab.ecommerce.infrastructure.adapter.in.web.mapper.ProductWebMapper;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.micrometer.core.instrument.MeterRegistry;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import java.net.URI;
@@ -46,6 +47,7 @@ public class ProductController {
   private final ProductService service;
   private final PricingUseCase pricing;
   private final ProductWebMapper mapper;
+  private final MeterRegistry meterRegistry;
 
   @GetMapping
   public PageResult<ProductResponse> findAll(
@@ -96,6 +98,10 @@ public class ProductController {
     PricingContext context = new PricingContext(
         parseTier(request.tier()), request.quantity(), request.couponCode());
     PriceQuote quote = pricing.quote(id, context);
+    // Metrica de negocio: cuenta presupuestos por estrategia aplicada.
+    // Micrometer cachea el contador por nombre+tags, asi que es seguro llamarlo aqui.
+    meterRegistry.counter("ecommerce.quotes.calculated",
+        "strategy", quote.getAppliedStrategy()).increment();
     return new PriceQuoteResponse(
         quote.getProductId(), quote.getUnitPrice(), quote.getQuantity(),
         quote.getSubtotal(), quote.getDiscount(), quote.getTotal(), quote.getAppliedStrategy());
