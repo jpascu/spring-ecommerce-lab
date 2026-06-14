@@ -933,7 +933,43 @@ HALF_OPEN = se dejan pasar unas pocas llamadas de prueba para ver si se recuper�
 curl http://localhost:8080/api/exchange-rates/USD    <span class="c"># 1.08 (real)</span>
 curl http://localhost:8080/api/exchange-rates/BOOM   <span class="c"># 1 (fallback: el proveedor "falla")</span></pre>
 
-      <h3>5d. Spring Cache <span class="badge todo">pendiente</span></h3>
+      <h3>5d. Spring Cache (Caffeine) <span class="badge done">hecho</span></h3>
+      <p>La abstracción de cache de Spring permite <strong>memorizar</strong> el resultado de un método costoso. La aplicamos a
+      los tipos de cambio: cambian poco y obtenerlos implica una llamada externa, así que cacheamos el resultado. La cache
+      <strong>envuelve</strong> a la resiliencia: un acierto evita por completo la llamada al proveedor (y por tanto el retry/CB).</p>
+
+      <h4>Cómo funciona</h4>
+      <pre><span class="k">@Service</span>
+<span class="k">class</span> ExchangeRateService <span class="k">implements</span> GetExchangeRateUseCase {
+  <span class="k">@Cacheable</span>(cacheNames = <span class="s">"exchangeRates"</span>, key = <span class="s">"#currency.toUpperCase()"</span>)
+  <span class="k">public</span> BigDecimal rateFor(String currency) {
+    <span class="k">return</span> exchangeRateProvider.getRate(currency);   <span class="c">// solo se ejecuta si NO está en cache</span>
+  }
+}</pre>
+      <p>Activamos la abstracción con <code>@EnableCaching</code> (en <code>CacheConfig</code>) y usamos <strong>Caffeine</strong>
+      como proveedor, configurado de forma declarativa:</p>
+      <pre>spring:
+  cache:
+    type: caffeine
+    cache-names: exchangeRates
+    caffeine:
+      spec: maximumSize=100,expireAfterWrite=5m,recordStats   <span class="c"># TTL 5 min, máx 100, con stats</span></pre>
+
+      <h4>El trío de anotaciones</h4>
+      <table>
+        <tr><th>Anotación</th><th>Qué hace</th></tr>
+        <tr><td><code>@Cacheable</code></td><td>Si hay valor en cache lo devuelve; si no, ejecuta el método y lo guarda</td></tr>
+        <tr><td><code>@CachePut</code></td><td>Ejecuta SIEMPRE el método y actualiza la cache con el resultado</td></tr>
+        <tr><td><code>@CacheEvict</code></td><td>Elimina entradas de la cache (p.ej. al actualizar/borrar el dato)</td></tr>
+      </table>
+      <div class="warn"><strong>Cuidado con la coherencia:</strong> si cacheas lecturas de una entidad mutable (p.ej.
+      <code>findById</code> de un producto), debes <strong>invalidar</strong> con <code>@CacheEvict</code> al modificarla, o
+      servirás datos obsoletos. Por eso aquí cacheamos tipos de cambio (cambian despacio) y no el catálogo.</div>
+      <div class="tip"><strong>Verificación:</strong> <code>ExchangeRateCacheIT</code> mockea el proveedor, pide dos veces la
+      misma divisa y verifica que <strong>solo se llama una vez</strong> (la segunda es un acierto de cache). Las estadísticas
+      (hits/misses) se publican como métricas Micrometer (<code>cache.gets</code>) gracias a <code>recordStats</code>.</div>
+      <pre>mvn test -Dtest=ExchangeRateCacheIT</pre>
+
       <h3>5e. Spring Security + JWT <span class="badge todo">pendiente</span></h3>
     </section>
 
@@ -1261,11 +1297,12 @@ curl http://localhost:8080/api/exchange-rates/BOOM   <span class="c"># 1 (fallba
         <tr><td><code>HealthIndicator</code></td><td>5</td><td>Health check de negocio en /actuator/health</td></tr>
         <tr><td><code>MeterRegistry</code> (Micrometer)</td><td>5</td><td>Métricas personalizadas (counters, timers...)</td></tr>
         <tr><td><code>@CircuitBreaker</code> / <code>@Retry</code> (Resilience4j)</td><td>5</td><td>Tolerancia a fallos de servicios externos</td></tr>
+        <tr><td><code>@EnableCaching</code> / <code>@Cacheable</code> / <code>@CacheEvict</code></td><td>5</td><td>Cache de métodos (Spring Cache + Caffeine)</td></tr>
       </table>
     </section>
 
     <footer>
-      <p>spring-ecommerce-lab — guía generada de forma incremental. Última fase documentada: <strong>Fase 5c (Resilience4j)</strong>.</p>
+      <p>spring-ecommerce-lab — guía generada de forma incremental. Última fase documentada: <strong>Fase 5d (Spring Cache)</strong>.</p>
     </footer>
   </main>
 </div>

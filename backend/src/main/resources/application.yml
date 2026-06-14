@@ -25,6 +25,13 @@ spring:
       enabled: true
       path: /h2-console
 
+  # Cache en memoria con Caffeine: expira a los 5 min, máx. 100 entradas, con estadísticas
+  cache:
+    type: caffeine
+    cache-names: exchangeRates
+    caffeine:
+      spec: maximumSize=100,expireAfterWrite=5m,recordStats
+
 server:
   port: 8080
 
