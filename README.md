@@ -43,7 +43,7 @@ spring-ecommerce-lab/
 - [x] **Fase 3 — Patrones de diseño**: motor de descuentos con Strategy, Template Method, Factory y Builder.
 - [x] **Fase 4 — Testing**: pirámide de tests — Mockito (unit), `@WebMvcTest`, `@DataJpaTest` + Testcontainers (PostgreSQL real), `@SpringBootTest`.
 - [x] **Fase 5 — Librerías Spring**: OpenAPI/Swagger · Actuator + métricas (Prometheus) · Resilience4j · Cache (Caffeine) · Security + JWT.
-- [ ] **Fase 6 — Async / eventos**: `@Async`, eventos de aplicación, mensajería.
+- [x] **Fase 6 — Async / eventos**: `@Async` con pool propio, eventos de aplicación (`ApplicationEventPublisher`) y `@TransactionalEventListener` (AFTER_COMMIT) para volcar al data lake en segundo plano.
 - [ ] **Fase 7 — Frontend Angular**: SPA que consume la API.
 - [ ] **Fase 8 — Calidad / entrega**: Docker, docker-compose, GitHub Actions CI.
 

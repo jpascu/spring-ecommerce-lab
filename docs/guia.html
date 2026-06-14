@@ -107,7 +107,7 @@
     <a href="#fase3">Fase 3 — Patrones ✅</a>
     <a href="#fase4">Fase 4 — Testing ✅</a>
     <a href="#fase5">Fase 5 — Librerías ✅</a>
-    <a href="#fase6">Fase 6 — Async/Eventos</a>
+    <a href="#fase6">Fase 6 — Async/Eventos ✅</a>
     <a href="#fase7">Fase 7 — Angular</a>
     <a href="#fase8">Fase 8 — Calidad/CI</a>
     <div class="group">Especiales</div>
@@ -1027,8 +1027,46 @@ curl -H "Authorization: Bearer $TOKEN" localhost:8080/api/products
     </section>
 
     <section id="fase6">
-      <h2>Fase 6 — Async &amp; eventos <span class="badge todo">pendiente</span></h2>
-      <p><code>@Async</code>, eventos de aplicación y mensajería.</p>
+      <h2>Fase 6 — Async &amp; eventos <span class="badge done">hecho</span></h2>
+      <p>Desacoplamos los <strong>efectos secundarios</strong> de la operación principal. Cuando se crea o actualiza un producto,
+      el volcado al <em>data lake</em> ya no se hace en línea (bloqueando la respuesta HTTP): se publica un <strong>evento</strong>
+      y un <em>listener</em> lo procesa <strong>en segundo plano</strong> y <strong>solo si la transacción confirma</strong>.</p>
+
+      <h4>El flujo de eventos</h4>
+      <pre>ProductServiceImpl.create()  (dentro de @Transactional)
+   │  guarda en BBDD
+   └─▶ eventPublisher.publish(ProductChangedEvent)        <span class="c">// puerto de salida (hexagonal)</span>
+         └─▶ ApplicationEventProductPublisher              <span class="c">// adaptador: lo pone en el bus de Spring</span>
+               └─▶ applicationEventPublisher.publishEvent(...)
+                     · · ·  (la transacción hace COMMIT)  · · ·
+                        └─▶ LakeProductEventPublisher.onProductChanged()   <span class="c">// @Async + AFTER_COMMIT</span>
+                              vuelca al lago en el hilo "lake-N" (no bloquea la petición)</pre>
+
+      <h4>Las dos garantías</h4>
+      <table>
+        <tr><th>Anotación</th><th>Qué aporta</th></tr>
+        <tr><td><code>@TransactionalEventListener(phase = AFTER_COMMIT)</code></td><td>El listener solo se ejecuta si la transacción <strong>confirmó</strong>. Si hay rollback, no se vuelca nada incoherente al lago.</td></tr>
+        <tr><td><code>@Async("lakeTaskExecutor")</code></td><td>Se ejecuta en un hilo del pool propio, así la respuesta HTTP no espera al volcado (latencia y resiliencia).</td></tr>
+      </table>
+      <p>El pool se define en <code>AsyncConfig</code> con <code>@EnableAsync</code> y un <code>ThreadPoolTaskExecutor</code>
+      (core 2, máx 5, cola 50, hilos <code>lake-*</code>). Un executor propio acota la concurrencia y da nombres útiles en logs.</p>
+
+      <h4>Por qué un evento y no una llamada directa</h4>
+      <p>El productor (la aplicación) no conoce a los consumidores: publica "ha cambiado un producto" y quien quiera reaccionar
+      se suscribe. Mañana podríamos añadir un segundo listener (invalidar cache, notificar, indexar en buscador) <strong>sin tocar
+      el servicio</strong>. Se mantiene la hexagonal: la aplicación habla con el puerto <code>ProductEventPublisherPort</code>; el
+      adaptador <code>ApplicationEventProductPublisher</code> traduce eso al bus de Spring.</p>
+
+      <div class="warn"><strong>Detalle clave de <code>@Async</code>:</strong> funciona por proxy (AOP), igual que
+      <code>@Transactional</code>. Por eso el listener vive en <strong>otro bean</strong> (no se auto-invoca) y el método es
+      público. Además, al saltar a otro hilo se pierde el contexto de la petición (Security, MDC del traceId, transacción): si se
+      necesitara, habría que propagarlo explícitamente.</div>
+      <div class="tip"><strong>Relación con riesgos:</strong> en un motor de decisión la respuesta al cliente no debe esperar a
+      tareas accesorias (auditoría, envío a un lago analítico, notificaciones). Publicar eventos AFTER_COMMIT y procesarlos async
+      mantiene baja la latencia y evita inconsistencias si la operación se revierte.</div>
+      <pre>mvn test -Dtest=ProductEventAsyncIT
+<span class="c"># en los logs verás el volcado en un hilo "lake-N", después del commit:</span>
+<span class="c"># [LAKE] (async hilo=lake-1) CREATED producto id=42 ...</span></pre>
     </section>
 
     <section id="fase7">
@@ -1353,11 +1391,13 @@ curl -H "Authorization: Bearer $TOKEN" localhost:8080/api/products
         <tr><td><code>@EnableCaching</code> / <code>@Cacheable</code> / <code>@CacheEvict</code></td><td>5</td><td>Cache de métodos (Spring Cache + Caffeine)</td></tr>
         <tr><td><code>SecurityFilterChain</code> / <code>@oauth2ResourceServer</code></td><td>5</td><td>Seguridad stateless con JWT</td></tr>
         <tr><td><code>JwtEncoder</code> / <code>JwtDecoder</code> (Nimbus)</td><td>5</td><td>Firmar y validar tokens JWT</td></tr>
+        <tr><td><code>@EnableAsync</code> / <code>@Async</code></td><td>6</td><td>Ejecución en segundo plano con un pool propio</td></tr>
+        <tr><td><code>ApplicationEventPublisher</code> / <code>@TransactionalEventListener</code></td><td>6</td><td>Eventos de aplicación desacoplados, tras commit</td></tr>
       </table>
     </section>
 
     <footer>
-      <p>spring-ecommerce-lab — guía generada de forma incremental. Última fase documentada: <strong>Fase 5 completa (Security + JWT)</strong>.</p>
+      <p>spring-ecommerce-lab — guía generada de forma incremental. Última fase documentada: <strong>Fase 6 (Async &amp; eventos)</strong>.</p>
     </footer>
   </main>
 </div>

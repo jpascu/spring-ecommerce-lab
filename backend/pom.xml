@@ -125,6 +125,13 @@
       <scope>test</scope>
     </dependency>
 
+    <!-- Awaitility: aserciones sobre código asíncrono (espera activa con timeout) -->
+    <dependency>
+      <groupId>org.awaitility</groupId>
+      <artifactId>awaitility</artifactId>
+      <scope>test</scope>
+    </dependency>
+
     <!-- Testcontainers: BBDD PostgreSQL real y efimera en Docker para tests de integracion -->
     <dependency>
       <groupId>org.springframework.boot</groupId>
