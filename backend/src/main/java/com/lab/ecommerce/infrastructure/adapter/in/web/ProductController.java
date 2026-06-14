@@ -12,6 +12,10 @@ import com.lab.ecommerce.infrastructure.adapter.in.web.dto.ProductRequest;
 import com.lab.ecommerce.infrastructure.adapter.in.web.dto.ProductResponse;
 import com.lab.ecommerce.infrastructure.adapter.in.web.dto.QuoteRequest;
 import com.lab.ecommerce.infrastructure.adapter.in.web.mapper.ProductWebMapper;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import java.net.URI;
 import lombok.RequiredArgsConstructor;
@@ -36,6 +40,7 @@ import org.springframework.web.util.UriComponentsBuilder;
 @RestController
 @RequestMapping("/api/products")
 @RequiredArgsConstructor
+@Tag(name = "Productos", description = "CRUD de productos y cálculo de presupuestos")
 public class ProductController {
 
   private final ProductService service;
@@ -52,11 +57,17 @@ public class ProductController {
     return service.findAll(query).map(mapper::toResponse);
   }
 
+  @Operation(summary = "Obtener un producto por id")
+  @ApiResponses({
+      @ApiResponse(responseCode = "200", description = "Producto encontrado"),
+      @ApiResponse(responseCode = "404", description = "Producto no encontrado", content = @io.swagger.v3.oas.annotations.media.Content)
+  })
   @GetMapping("/{id}")
   public ProductResponse findById(@PathVariable Long id) {
     return mapper.toResponse(service.findById(id));
   }
 
+  @Operation(summary = "Crear un producto")
   @PostMapping
   public ResponseEntity<ProductResponse> create(@Valid @RequestBody ProductRequest request,
       UriComponentsBuilder uriBuilder) {
@@ -78,6 +89,8 @@ public class ProductController {
     service.delete(id);
   }
 
+  @Operation(summary = "Calcular presupuesto",
+      description = "Aplica el motor de descuentos (cupón > volumen > fidelidad) y devuelve el total.")
   @PostMapping("/{id}/quote")
   public PriceQuoteResponse quote(@PathVariable Long id, @Valid @RequestBody QuoteRequest request) {
     PricingContext context = new PricingContext(

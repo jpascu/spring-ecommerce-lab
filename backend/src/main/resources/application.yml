@@ -28,6 +28,14 @@ spring:
 server:
   port: 8080
 
+# Documentacion OpenAPI / Swagger UI (springdoc)
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html          # UI interactiva
+    operations-sorter: method
+  api-docs:
+    path: /v3/api-docs              # especificacion JSON
+
 # Exponemos endpoints de Actuator para observabilidad (health, info, metrics)
 management:
   endpoints:

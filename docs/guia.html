@@ -106,7 +106,7 @@
     <a href="#fase2">Fase 2 — Buenas prácticas ✅</a>
     <a href="#fase3">Fase 3 — Patrones ✅</a>
     <a href="#fase4">Fase 4 — Testing ✅</a>
-    <a href="#fase5">Fase 5 — Librerías</a>
+    <a href="#fase5">Fase 5 — Librerías ⏳</a>
     <a href="#fase6">Fase 6 — Async/Eventos</a>
     <a href="#fase7">Fase 7 — Angular</a>
     <a href="#fase8">Fase 8 — Calidad/CI</a>
@@ -767,8 +767,45 @@ mvn verify   <span class="c"># + integración: requiere Docker (Testcontainers l
     </section>
 
     <section id="fase5">
-      <h2>Fase 5 — Librerías Spring <span class="badge todo">pendiente</span></h2>
-      <p>OpenAPI/Swagger, Actuator avanzado, Resilience4j, Spring Cache y Spring Security + JWT.</p>
+      <h2>Fase 5 — Librerías Spring <span class="badge next">en curso</span></h2>
+      <p>Integramos librerías del ecosistema, una a una: <strong>OpenAPI/Swagger ✅</strong>, Actuator avanzado, Resilience4j,
+      Spring Cache y Spring Security + JWT.</p>
+
+      <h3>5a. OpenAPI / Swagger UI <span class="badge done">hecho</span></h3>
+      <p>Con <code>springdoc-openapi</code> generamos automáticamente la especificación <strong>OpenAPI 3</strong> a partir de los
+      <code>@RestController</code> y la mostramos en una UI interactiva donde se puede probar la API desde el navegador.</p>
+      <table>
+        <tr><th>Recurso</th><th>URL</th></tr>
+        <tr><td>Swagger UI (interactiva)</td><td><code>http://localhost:8080/swagger-ui.html</code></td></tr>
+        <tr><td>Especificación JSON</td><td><code>http://localhost:8080/v3/api-docs</code></td></tr>
+      </table>
+      <p>Una sola dependencia activa el escaneo y la UI:</p>
+      <pre><span class="c">&lt;!-- pom.xml --&gt;</span>
+&lt;dependency&gt;
+  &lt;groupId&gt;org.springdoc&lt;/groupId&gt;
+  &lt;artifactId&gt;springdoc-openapi-starter-webmvc-ui&lt;/artifactId&gt;
+&lt;/dependency&gt;</pre>
+      <p>Los metadatos globales (título, versión, contacto) se definen en un bean <code>OpenAPI</code> en
+      <code>OpenApiConfig</code>; y cada endpoint se enriquece con anotaciones:</p>
+      <pre><span class="k">@Tag</span>(name = <span class="s">"Productos"</span>, description = <span class="s">"CRUD de productos y presupuestos"</span>)
+<span class="k">class</span> ProductController {
+
+  <span class="k">@Operation</span>(summary = <span class="s">"Obtener un producto por id"</span>)
+  <span class="k">@ApiResponses</span>({
+    <span class="k">@ApiResponse</span>(responseCode = <span class="s">"200"</span>, description = <span class="s">"Producto encontrado"</span>),
+    <span class="k">@ApiResponse</span>(responseCode = <span class="s">"404"</span>, description = <span class="s">"No encontrado"</span>)
+  })
+  <span class="k">@GetMapping</span>(<span class="s">"/{id}"</span>) ProductResponse findById(...) { ... }
+}</pre>
+      <div class="tip"><strong>Por qué importa:</strong> la documentación se genera del código, así que no se desactualiza. La spec
+      JSON sirve además para generar clientes (Angular en la Fase 7), contratos y tests de contrato. Lo cubrimos con
+      <code>OpenApiDocsIT</code>, que verifica que la spec se expone con nuestros metadatos.</div>
+      <pre>mvn test -Dtest=OpenApiDocsIT   <span class="c"># o abre /swagger-ui.html con la app levantada</span></pre>
+
+      <h3>5b. Actuator avanzado <span class="badge todo">pendiente</span></h3>
+      <h3>5c. Resilience4j <span class="badge todo">pendiente</span></h3>
+      <h3>5d. Spring Cache <span class="badge todo">pendiente</span></h3>
+      <h3>5e. Spring Security + JWT <span class="badge todo">pendiente</span></h3>
     </section>
 
     <section id="fase6">
@@ -1091,11 +1128,12 @@ mvn verify   <span class="c"># + integración: requiere Docker (Testcontainers l
         <tr><td><code>@DataJpaTest</code> / <code>@AutoConfigureTestDatabase</code></td><td>4</td><td>Slice de la capa JPA</td></tr>
         <tr><td><code>@Testcontainers</code> / <code>@Container</code></td><td>4</td><td>Gestiona el ciclo de vida de contenedores</td></tr>
         <tr><td><code>@ServiceConnection</code></td><td>4</td><td>Conecta Spring al contenedor automáticamente</td></tr>
+        <tr><td><code>@Tag</code> / <code>@Operation</code> / <code>@ApiResponse</code></td><td>5</td><td>Documentación OpenAPI de los endpoints</td></tr>
       </table>
     </section>
 
     <footer>
-      <p>spring-ecommerce-lab — guía generada de forma incremental. Última fase documentada: <strong>Fase 4</strong>.</p>
+      <p>spring-ecommerce-lab — guía generada de forma incremental. Última fase documentada: <strong>Fase 5a (OpenAPI)</strong>.</p>
     </footer>
   </main>
 </div>
