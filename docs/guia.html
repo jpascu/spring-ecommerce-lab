@@ -106,7 +106,7 @@
     <a href="#fase2">Fase 2 — Buenas prácticas ✅</a>
     <a href="#fase3">Fase 3 — Patrones ✅</a>
     <a href="#fase4">Fase 4 — Testing ✅</a>
-    <a href="#fase5">Fase 5 — Librerías ⏳</a>
+    <a href="#fase5">Fase 5 — Librerías ✅</a>
     <a href="#fase6">Fase 6 — Async/Eventos</a>
     <a href="#fase7">Fase 7 — Angular</a>
     <a href="#fase8">Fase 8 — Calidad/CI</a>
@@ -767,9 +767,9 @@ mvn verify   <span class="c"># + integración: requiere Docker (Testcontainers l
     </section>
 
     <section id="fase5">
-      <h2>Fase 5 — Librerías Spring <span class="badge next">en curso</span></h2>
-      <p>Integramos librerías del ecosistema, una a una: <strong>OpenAPI/Swagger ✅</strong>, Actuator avanzado, Resilience4j,
-      Spring Cache y Spring Security + JWT.</p>
+      <h2>Fase 5 — Librerías Spring <span class="badge done">hecho</span></h2>
+      <p>Integramos librerías del ecosistema, una a una: <strong>OpenAPI/Swagger</strong>, <strong>Actuator + métricas</strong>,
+      <strong>Resilience4j</strong>, <strong>Spring Cache</strong> y <strong>Spring Security + JWT</strong>.</p>
 
       <h3>5a. OpenAPI / Swagger UI <span class="badge done">hecho</span></h3>
       <p>Con <code>springdoc-openapi</code> generamos automáticamente la especificación <strong>OpenAPI 3</strong> a partir de los
@@ -970,7 +970,60 @@ curl http://localhost:8080/api/exchange-rates/BOOM   <span class="c"># 1 (fallba
       (hits/misses) se publican como métricas Micrometer (<code>cache.gets</code>) gracias a <code>recordStats</code>.</div>
       <pre>mvn test -Dtest=ExchangeRateCacheIT</pre>
 
-      <h3>5e. Spring Security + JWT <span class="badge todo">pendiente</span></h3>
+      <h3>5e. Spring Security + JWT <span class="badge done">hecho</span></h3>
+      <p>Protegemos la API con <strong>autenticación stateless por JWT</strong> y <strong>autorización por roles</strong>. La app
+      actúa como <em>resource server</em>: en cada petición valida el token (no hay sesión en servidor), lo que escala bien y
+      encaja con microservicios.</p>
+
+      <h4>El flujo</h4>
+      <pre>1. POST /api/auth/login {usuario, contraseña}
+        └─▶ AuthenticationManager valida credenciales (BCrypt)
+            └─▶ JwtTokenService firma un JWT (HS256) con subject + claim "roles"
+                └─▶ respuesta { accessToken, tokenType: "Bearer", expiresIn: 3600 }
+
+2. Cada petición protegida envía:  Authorization: Bearer &lt;token&gt;
+        └─▶ el resource server valida la firma y la expiración (JwtDecoder)
+            └─▶ mapea el claim "roles" a authorities y aplica las reglas de acceso</pre>
+
+      <h4>Reglas de autorización</h4>
+      <table>
+        <tr><th>Endpoint</th><th>Acceso</th></tr>
+        <tr><td><code>/api/auth/**</code>, <code>/swagger-ui/**</code>, <code>/v3/api-docs/**</code>, <code>/actuator/**</code></td><td>público</td></tr>
+        <tr><td><code>GET /api/products/**</code>, <code>/api/exchange-rates/**</code></td><td>autenticado (USER o ADMIN)</td></tr>
+        <tr><td><code>POST /api/products/*/quote</code></td><td>autenticado</td></tr>
+        <tr><td><code>POST/PUT/DELETE /api/products</code></td><td><strong>solo ADMIN</strong></td></tr>
+      </table>
+      <p>Usuarios de ejemplo (en memoria): <code>user/password</code> (ROLE_USER) y <code>admin/password</code>
+      (ROLE_USER + ROLE_ADMIN).</p>
+
+      <h4>Piezas clave</h4>
+      <pre><span class="c">// SecurityConfig: cadena de filtros stateless con JWT</span>
+http.csrf(disable)                                  <span class="c">// API sin cookies -> CSRF no aplica</span>
+    .sessionManagement(STATELESS)
+    .authorizeHttpRequests(...)                      <span class="c">// reglas por ruta/método/rol</span>
+    .oauth2ResourceServer(o -> o.jwt(...));          <span class="c">// valida el Bearer token
+
+// Codificación/decodificación con secreto HMAC compartido</span>
+JwtEncoder = NimbusJwtEncoder(secret);               <span class="c">// firma (login)</span>
+JwtDecoder = NimbusJwtDecoder.withSecretKey(secret); <span class="c">// valida (cada request)</span></pre>
+      <div class="warn"><strong>Buenas prácticas aplicadas:</strong> contraseñas con <strong>BCrypt</strong> (nunca en claro);
+      el secreto del JWT se inyecta por variable de entorno (<code>JWT_SECRET</code>), no se hardcodea; credenciales inválidas
+      devuelven <strong>401</strong> sin revelar el motivo. En producción los usuarios vendrían de BBDD o de un IdP (Keycloak,
+      Cognito) y se usaría firma asimétrica (RSA/EC) en vez de secreto compartido.</div>
+      <div class="tip"><strong>Relación con riesgos:</strong> los motores de decisión se exponen como APIs internas que deben
+      autenticar al consumidor y autorizar por scope/rol. El patrón resource server + JWT es exactamente el que usan esos
+      servicios; aquí lo practicas de punta a punta.</div>
+      <pre>mvn test -Dtest=SecurityIT
+<span class="c"># manual:</span>
+TOKEN=$(curl -s -X POST localhost:8080/api/auth/login -H 'Content-Type: application/json' \
+  -d '{"username":"admin","password":"password"}' | jq -r .accessToken)
+curl -H "Authorization: Bearer $TOKEN" localhost:8080/api/products
+<span class="c"># En Swagger UI: botón "Authorize" y pega el token.</span></pre>
+
+      <div class="note" style="margin-top:18px"><strong>Fase 5 completada.</strong> Hemos integrado cinco librerías del
+      ecosistema Spring: OpenAPI, Actuator/Micrometer, Resilience4j, Spring Cache y Spring Security + JWT, manteniendo la
+      arquitectura hexagonal (la lógica vive en dominio/aplicación; estas librerías actúan en los adaptadores y la
+      configuración).</div>
     </section>
 
     <section id="fase6">
@@ -1298,11 +1351,13 @@ curl http://localhost:8080/api/exchange-rates/BOOM   <span class="c"># 1 (fallba
         <tr><td><code>MeterRegistry</code> (Micrometer)</td><td>5</td><td>Métricas personalizadas (counters, timers...)</td></tr>
         <tr><td><code>@CircuitBreaker</code> / <code>@Retry</code> (Resilience4j)</td><td>5</td><td>Tolerancia a fallos de servicios externos</td></tr>
         <tr><td><code>@EnableCaching</code> / <code>@Cacheable</code> / <code>@CacheEvict</code></td><td>5</td><td>Cache de métodos (Spring Cache + Caffeine)</td></tr>
+        <tr><td><code>SecurityFilterChain</code> / <code>@oauth2ResourceServer</code></td><td>5</td><td>Seguridad stateless con JWT</td></tr>
+        <tr><td><code>JwtEncoder</code> / <code>JwtDecoder</code> (Nimbus)</td><td>5</td><td>Firmar y validar tokens JWT</td></tr>
       </table>
     </section>
 
     <footer>
-      <p>spring-ecommerce-lab — guía generada de forma incremental. Última fase documentada: <strong>Fase 5d (Spring Cache)</strong>.</p>
+      <p>spring-ecommerce-lab — guía generada de forma incremental. Última fase documentada: <strong>Fase 5 completa (Security + JWT)</strong>.</p>
     </footer>
   </main>
 </div>

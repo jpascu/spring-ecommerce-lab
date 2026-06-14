@@ -11,6 +11,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
+import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -18,10 +19,13 @@ import org.springframework.test.web.servlet.MockMvc;
  * Test de integracion del CRUD que ejercita todas las capas hexagonales
  * (controller -> puerto in -> servicio -> puerto out -> adaptador JPA -> H2).
  * Usa el perfil "test" para que NO se ejecute el DataSeeder de "dev".
+ *
+ * <p>Se autentica como ADMIN (operaciones de escritura del catálogo lo requieren).</p>
  */
 @SpringBootTest
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
+@WithMockUser(roles = "ADMIN")
 class ProductControllerIT {
 
   @Autowired

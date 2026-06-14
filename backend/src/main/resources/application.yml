@@ -63,6 +63,12 @@ management:
     circuitbreakers:
       enabled: true                # publica el estado del circuit breaker en /actuator/health
 
+# Seguridad: secreto para firmar/validar el JWT (HS256 requiere >= 32 bytes).
+# En produccion se inyecta por variable de entorno / secreto, nunca en el repo.
+security:
+  jwt:
+    secret: ${JWT_SECRET:cambia-este-secreto-de-desarrollo-no-usar-en-produccion-1234}
+
 # Metadatos expuestos en /actuator/info
 info:
   app:

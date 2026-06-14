@@ -9,6 +9,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.slf4j.MDC;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.AuthenticationException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -49,6 +50,15 @@ public class WebExceptionHandler {
   public ResponseEntity<ApiError> handleIllegalArgument(IllegalArgumentException ex,
       HttpServletRequest request) {
     return build(HttpStatus.BAD_REQUEST, ex.getMessage(), request, List.of());
+  }
+
+  /**
+   * Credenciales inválidas en el login: 401 sin revelar el motivo exacto.
+   */
+  @ExceptionHandler(AuthenticationException.class)
+  public ResponseEntity<ApiError> handleAuthentication(AuthenticationException ex,
+      HttpServletRequest request) {
+    return build(HttpStatus.UNAUTHORIZED, "Credenciales invalidas", request, List.of());
   }
 
   /**

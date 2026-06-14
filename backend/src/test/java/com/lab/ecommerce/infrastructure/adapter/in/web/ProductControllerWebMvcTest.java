@@ -31,6 +31,7 @@ import org.springframework.test.web.servlet.MockMvc;
  * test es rápido y se centra en el comportamiento HTTP.
  */
 @WebMvcTest(ProductController.class)
+@org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc(addFilters = false)
 class ProductControllerWebMvcTest {
 
   @Autowired

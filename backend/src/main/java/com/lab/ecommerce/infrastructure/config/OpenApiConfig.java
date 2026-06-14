@@ -1,9 +1,12 @@
 package com.lab.ecommerce.infrastructure.config;
 
+import io.swagger.v3.oas.models.Components;
 import io.swagger.v3.oas.models.OpenAPI;
 import io.swagger.v3.oas.models.info.Contact;
 import io.swagger.v3.oas.models.info.Info;
 import io.swagger.v3.oas.models.info.License;
+import io.swagger.v3.oas.models.security.SecurityRequirement;
+import io.swagger.v3.oas.models.security.SecurityScheme;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -17,6 +20,8 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 public class OpenApiConfig {
 
+  private static final String BEARER = "bearerAuth";
+
   @Bean
   public OpenAPI ecommerceOpenApi() {
     return new OpenAPI()
@@ -26,6 +31,12 @@ public class OpenApiConfig {
                 + "Gestión de productos y motor de presupuestos con descuentos.")
             .version("v1")
             .contact(new Contact().name("spring-ecommerce-lab"))
-            .license(new License().name("MIT")));
+            .license(new License().name("MIT")))
+        // Define el esquema JWT y el botón "Authorize" en Swagger UI
+        .components(new Components().addSecuritySchemes(BEARER, new SecurityScheme()
+            .type(SecurityScheme.Type.HTTP)
+            .scheme("bearer")
+            .bearerFormat("JWT")))
+        .addSecurityItem(new SecurityRequirement().addList(BEARER));
   }
 }
