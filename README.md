@@ -42,7 +42,7 @@ spring-ecommerce-lab/
 - [x] **Fase 2 — Buenas prácticas**: manejo global de errores (`ApiError`), paginación/ordenación, logging con `traceId`.
 - [x] **Fase 3 — Patrones de diseño**: motor de descuentos con Strategy, Template Method, Factory y Builder.
 - [x] **Fase 4 — Testing**: pirámide de tests — Mockito (unit), `@WebMvcTest`, `@DataJpaTest` + Testcontainers (PostgreSQL real), `@SpringBootTest`.
-- [ ] **Fase 5 — Librerías Spring** (en curso): [x] OpenAPI/Swagger · [x] Actuator + métricas (Prometheus) · [ ] Resilience4j · [ ] Cache · [ ] Security + JWT.
+- [ ] **Fase 5 — Librerías Spring** (en curso): [x] OpenAPI/Swagger · [x] Actuator + métricas (Prometheus) · [x] Resilience4j · [ ] Cache · [ ] Security + JWT.
 - [ ] **Fase 6 — Async / eventos**: `@Async`, eventos de aplicación, mensajería.
 - [ ] **Fase 7 — Frontend Angular**: SPA que consume la API.
 - [ ] **Fase 8 — Calidad / entrega**: Docker, docker-compose, GitHub Actions CI.
@@ -72,6 +72,7 @@ mvn verify   # + tests de integración (*IT, Failsafe): CRUD end-to-end
 - `GET /api/products?page=0&size=20&sort=name&direction=asc` — listado **paginado** (`PageResult`)
 - `POST /api/products`, `GET/PUT/DELETE /api/products/{id}` — CRUD de productos
 - `POST /api/products/{id}/quote` — **presupuesto** con motor de descuentos (tier, cantidad, cupón)
+- `GET /api/exchange-rates/{currency}` — proveedor externo protegido con **Resilience4j** (retry + circuit breaker + fallback)
 - Errores con formato estándar `ApiError` (incluye `traceId` y `fieldErrors` en validación)
 - Cabecera `X-Request-Id` (correlation id) en cada respuesta
 - Consola H2: http://localhost:8080/h2-console (JDBC `jdbc:h2:mem:shopdb`, user `sa`)

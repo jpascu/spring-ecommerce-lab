@@ -868,7 +868,71 @@ management:
 curl http://localhost:8080/actuator/health
 curl http://localhost:8080/actuator/prometheus | grep ecommerce_quotes</pre>
 
-      <h3>5c. Resilience4j <span class="badge todo">pendiente</span></h3>
+      <h3>5c. Resilience4j (tolerancia a fallos) <span class="badge done">hecho</span></h3>
+      <p>Cuando llamamos a un <strong>servicio externo</strong> (un bureau, una pasarela, un proveedor de precios), ese servicio
+      puede fallar o ir lento. <strong>Resilience4j</strong> nos da patrones para que <em>su</em> fallo no tumbe <em>nuestra</em>
+      app. Lo aplicamos a un proveedor de tipos de cambio simulado (<code>FlakyExchangeRateAdapter</code>), expuesto en
+      <code>GET /api/exchange-rates/{currency}</code>.</p>
+
+      <h4>Los patrones</h4>
+      <table>
+        <tr><th>Patrón</th><th>Qué hace</th><th>Anotación</th></tr>
+        <tr><td><strong>Retry</strong></td><td>Reintenta los fallos transitorios (un pico puntual)</td><td><code>@Retry</code></td></tr>
+        <tr><td><strong>Circuit Breaker</strong></td><td>Si el servicio falla repetidamente, "abre el circuito" y deja de llamarlo un tiempo</td><td><code>@CircuitBreaker</code></td></tr>
+        <tr><td><strong>Fallback</strong></td><td>Respuesta alternativa cuando todo falla (valor por defecto, caché...)</td><td><code>fallbackMethod</code></td></tr>
+        <tr><td><strong>Time Limiter</strong></td><td>Corta llamadas que tardan demasiado</td><td><code>@TimeLimiter</code></td></tr>
+        <tr><td><strong>Bulkhead</strong></td><td>Limita llamadas concurrentes para aislar recursos</td><td><code>@Bulkhead</code></td></tr>
+      </table>
+
+      <h4>El circuit breaker en 3 estados</h4>
+      <pre>CLOSED  ──(muchos fallos: &gt;50%)──▶  OPEN  ──(pasados 10s)──▶  HALF_OPEN
+   ▲                                                              │
+   └──────────────(las llamadas de prueba van bien)──────────────┘
+
+CLOSED    = todo normal, las llamadas pasan al proveedor
+OPEN      = el proveedor está "caído": NO se le llama, va directo al fallback
+HALF_OPEN = se dejan pasar unas pocas llamadas de prueba para ver si se recuperó</pre>
+
+      <h4>El adaptador protegido</h4>
+      <p>La resiliencia vive en el <strong>adaptador de salida</strong> (el borde), no en el dominio. El método del fallback debe
+      tener la misma firma más un <code>Throwable</code>:</p>
+      <pre><span class="k">@Component</span>
+<span class="k">class</span> FlakyExchangeRateAdapter <span class="k">implements</span> ExchangeRateProviderPort {
+
+  <span class="k">@Retry</span>(name = <span class="s">"exchangeRate"</span>)
+  <span class="k">@CircuitBreaker</span>(name = <span class="s">"exchangeRate"</span>, fallbackMethod = <span class="s">"fallbackRate"</span>)
+  <span class="k">public</span> BigDecimal getRate(String currency) {
+    <span class="c">// ...llama al proveedor externo; puede lanzar ExternalServiceException</span>
+  }
+
+  <span class="k">private</span> BigDecimal fallbackRate(String currency, Throwable t) {
+    <span class="k">return</span> BigDecimal.ONE;   <span class="c">// tasa por defecto si el proveedor no responde</span>
+  }
+}</pre>
+      <p>Y la configuración declarativa en <code>application.yml</code>:</p>
+      <pre>resilience4j:
+  retry:
+    instances:
+      exchangeRate: { max-attempts: 3, wait-duration: 100ms }
+  circuitbreaker:
+    instances:
+      exchangeRate:
+        sliding-window-size: 10
+        failure-rate-threshold: 50          <span class="c"># % de fallos que abre el circuito</span>
+        wait-duration-in-open-state: 10s</pre>
+      <div class="warn"><strong>Dos detalles importantes:</strong> (1) las anotaciones funcionan por <strong>AOP</strong>
+      (proxies), así que necesitan <code>spring-boot-starter-aop</code> y que la llamada venga de <em>otro</em> bean (no
+      self-invocation). (2) El estado del circuito se publica en <code>/actuator/health</code>
+      (<code>management.health.circuitbreakers.enabled: true</code>).</div>
+
+      <div class="tip"><strong>Relación con riesgos:</strong> es justo lo que necesitas al integrar bureaus externos (Schufa,
+      CCC...). Si el bureau cae, el circuit breaker evita saturarlo con reintentos y un fallback aplica una política degradada
+      (p.ej. decisión conservadora) en vez de tumbar el motor entero.</div>
+      <pre>mvn test -Dtest=ExchangeRateResilienceIT
+<span class="c"># manual (con la app arrancada):</span>
+curl http://localhost:8080/api/exchange-rates/USD    <span class="c"># 1.08 (real)</span>
+curl http://localhost:8080/api/exchange-rates/BOOM   <span class="c"># 1 (fallback: el proveedor "falla")</span></pre>
+
       <h3>5d. Spring Cache <span class="badge todo">pendiente</span></h3>
       <h3>5e. Spring Security + JWT <span class="badge todo">pendiente</span></h3>
     </section>
@@ -1196,11 +1260,12 @@ curl http://localhost:8080/actuator/prometheus | grep ecommerce_quotes</pre>
         <tr><td><code>@Tag</code> / <code>@Operation</code> / <code>@ApiResponse</code></td><td>5</td><td>Documentación OpenAPI de los endpoints</td></tr>
         <tr><td><code>HealthIndicator</code></td><td>5</td><td>Health check de negocio en /actuator/health</td></tr>
         <tr><td><code>MeterRegistry</code> (Micrometer)</td><td>5</td><td>Métricas personalizadas (counters, timers...)</td></tr>
+        <tr><td><code>@CircuitBreaker</code> / <code>@Retry</code> (Resilience4j)</td><td>5</td><td>Tolerancia a fallos de servicios externos</td></tr>
       </table>
     </section>
 
     <footer>
-      <p>spring-ecommerce-lab — guía generada de forma incremental. Última fase documentada: <strong>Fase 5b (Actuator + métricas)</strong>.</p>
+      <p>spring-ecommerce-lab — guía generada de forma incremental. Última fase documentada: <strong>Fase 5c (Resilience4j)</strong>.</p>
     </footer>
   </main>
 </div>

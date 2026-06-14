@@ -52,9 +52,31 @@ management:
     tags:
       application: ${spring.application.name}   # etiqueta comun para todas las metricas
 
+  health:
+    circuitbreakers:
+      enabled: true                # publica el estado del circuit breaker en /actuator/health
+
 # Metadatos expuestos en /actuator/info
 info:
   app:
     name: spring-ecommerce-lab
     description: Backend de aprendizaje Spring Boot (arquitectura hexagonal)
     phase: "Fase 5 - Librerias Spring"
+
+# Resilience4j: tolerancia a fallos del proveedor externo de tipos de cambio
+resilience4j:
+  retry:
+    instances:
+      exchangeRate:
+        max-attempts: 3            # 1 intento + 2 reintentos
+        wait-duration: 100ms
+  circuitbreaker:
+    instances:
+      exchangeRate:
+        register-health-indicator: true
+        sliding-window-type: COUNT_BASED
+        sliding-window-size: 10
+        minimum-number-of-calls: 5
+        failure-rate-threshold: 50          # % de fallos que abre el circuito
+        wait-duration-in-open-state: 10s    # tiempo abierto antes de probar (half-open)
+        permitted-number-of-calls-in-half-open-state: 3
