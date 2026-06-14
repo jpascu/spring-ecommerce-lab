@@ -105,7 +105,7 @@
     <a href="#fase1">Fase 1 — CRUD ✅</a>
     <a href="#fase2">Fase 2 — Buenas prácticas ✅</a>
     <a href="#fase3">Fase 3 — Patrones ✅</a>
-    <a href="#fase4">Fase 4 — Testing</a>
+    <a href="#fase4">Fase 4 — Testing ✅</a>
     <a href="#fase5">Fase 5 — Librerías</a>
     <a href="#fase6">Fase 6 — Async/Eventos</a>
     <a href="#fase7">Fase 7 — Angular</a>
@@ -680,9 +680,90 @@ curl -X POST http://localhost:8080/api/products/1/quote \
     </section>
 
     <section id="fase4">
-      <h2>Fase 4 — Testing <span class="badge todo">pendiente</span></h2>
-      <p>JUnit 5, Mockito, AssertJ, test de <em>slices</em> (<code>@WebMvcTest</code>, <code>@DataJpaTest</code>) y
-      <strong>Testcontainers</strong> (ver sección dedicada más abajo).</p>
+      <h2>Fase 4 — Testing <span class="badge done">hecho</span></h2>
+      <p>Cubrimos los tres niveles de la <strong>pirámide de tests</strong> con la herramienta adecuada en cada uno: muchos tests
+      rápidos y aislados abajo, pocos y completos arriba. La arquitectura hexagonal hace esto fácil porque el dominio se puede
+      probar sin levantar nada.</p>
+      <pre>        /\        E2E / @SpringBootTest  (lento, pocos)   -> ProductControllerIT, PricingControllerIT
+       /  \       slices: @WebMvcTest / @DataJpaTest        -> ProductControllerWebMvcTest, ProductJpaRepositoryIT
+      /----\      unitarios (Mockito / puros)  (rápidos, muchos) -> ProductServiceImplTest, DiscountEngineTest
+     /______\</pre>
+
+      <h3>1. Test unitario con Mockito (la base)</h3>
+      <p>Para el caso de uso <code>ProductServiceImpl</code> no necesitamos BBDD ni Spring: <strong>mockeamos los puertos</strong>
+      de salida y probamos solo la lógica. <code>@ExtendWith(MockitoExtension.class)</code> + <code>@Mock</code> +
+      <code>@InjectMocks</code> arman el servicio con dobles.</p>
+      <pre><span class="k">@ExtendWith</span>(MockitoExtension.class)
+<span class="k">class</span> ProductServiceImplTest {
+  <span class="k">@Mock</span>  ProductRepositoryPort repository;       <span class="c">// puerto OUT simulado</span>
+  <span class="k">@Mock</span>  ProductEventPublisherPort eventPublisher;
+  <span class="k">@InjectMocks</span> ProductServiceImpl service;
+
+  <span class="k">@Test</span> <span class="k">void</span> create_resetea_id_y_publica_evento() {
+    when(repository.save(any())).thenAnswer(...);
+    service.create(input);
+    verify(repository).save(captor.capture());        <span class="c">// ArgumentCaptor</span>
+    assertThat(captor.getValue().getId()).isNull();   <span class="c">// AssertJ</span>
+    verify(eventPublisher).publish(any());            <span class="c">// se publicó el evento</span>
+  }
+}</pre>
+      <div class="tip"><strong>Mockito en 3 verbos:</strong> <code>when(...).thenReturn(...)</code> programa respuestas;
+      <code>verify(...)</code> comprueba interacciones; <code>ArgumentCaptor</code> captura el argumento real para inspeccionarlo.
+      <code>never()</code> verifica que algo <em>no</em> ocurrió (ej. que un update inexistente no guarda nada).</div>
+
+      <h3>2. Slice de persistencia: <code>@DataJpaTest</code> + Testcontainers</h3>
+      <p><code>@DataJpaTest</code> arranca <strong>solo</strong> la capa JPA (repositorios, EntityManager), no el contexto entero.
+      En vez de H2 usamos un <strong>PostgreSQL real</strong> con Testcontainers, para testear contra el mismo motor que producción.</p>
+      <pre><span class="k">@DataJpaTest</span>
+<span class="k">@AutoConfigureTestDatabase</span>(replace = Replace.NONE)  <span class="c">// no sustituyas por H2</span>
+<span class="k">@Testcontainers</span>
+<span class="k">class</span> ProductJpaRepositoryIT {
+  <span class="k">@Container</span> <span class="k">@ServiceConnection</span>                    <span class="c">// conecta el DataSource al contenedor</span>
+  <span class="k">static</span> PostgreSQLContainer&lt;?&gt; postgres = <span class="k">new</span> PostgreSQLContainer&lt;&gt;(<span class="s">"postgres:16-alpine"</span>);
+
+  <span class="k">@Autowired</span> ProductJpaRepository repository;
+  <span class="c">// ... save/findById, verificación de @CreationTimestamp y @UpdateTimestamp</span>
+}</pre>
+      <div class="note">Ver la sección dedicada <a class="anchor" href="#testcontainers">🐳 Testcontainers (deep dive)</a> para los
+      detalles de cómo funciona y por qué <code>@ServiceConnection</code> evita configurar URL/usuario a mano.</div>
+
+      <h3>3. Slice web: <code>@WebMvcTest</code></h3>
+      <p>Arranca solo la capa MVC (controllers, validación, serialización JSON, los <code>@RestControllerAdvice</code>). Las
+      dependencias del controller se sustituyen con <code>@MockBean</code>. Ideal para verificar el <strong>contrato HTTP</strong>
+      (status, JSON, validación) sin tocar servicio ni BBDD.</p>
+      <pre><span class="k">@WebMvcTest</span>(ProductController.class)
+<span class="k">class</span> ProductControllerWebMvcTest {
+  <span class="k">@Autowired</span> MockMvc mockMvc;
+  <span class="k">@MockBean</span> ProductService service;
+  <span class="k">@MockBean</span> PricingUseCase pricing;
+  <span class="k">@MockBean</span> ProductWebMapper mapper;
+
+  <span class="k">@Test</span> <span class="k">void</span> getById_inexistente_devuelve_404() {
+    when(service.findById(99L)).thenThrow(<span class="k">new</span> ProductNotFoundException(99L));
+    mockMvc.perform(get(<span class="s">"/api/products/99"</span>))
+        .andExpect(status().isNotFound())
+        .andExpect(jsonPath(<span class="s">"$.status"</span>).value(404));
+  }
+}</pre>
+
+      <h3>4. Test end-to-end: <code>@SpringBootTest</code></h3>
+      <p>Los que ya teníamos (<code>ProductControllerIT</code>, <code>PricingControllerIT</code>) levantan el contexto completo y
+      ejercitan todas las capas hexagonales de extremo a extremo. Son los más realistas, pero también los más lentos: por eso van
+      arriba en la pirámide y se mantienen en número reducido.</p>
+
+      <h3>Surefire vs Failsafe (unit vs integration)</h3>
+      <table>
+        <tr><th>Plugin</th><th>Fase Maven</th><th>Convención de nombre</th><th>Aquí</th></tr>
+        <tr><td>Surefire</td><td><code>test</code></td><td><code>*Test</code></td><td>unitarios (Mockito, puros, @WebMvcTest)</td></tr>
+        <tr><td>Failsafe</td><td><code>verify</code></td><td><code>*IT</code></td><td>integración (@SpringBootTest, Testcontainers)</td></tr>
+      </table>
+
+      <h3>Cómo se prueba la Fase 4</h3>
+      <pre>mvn test     <span class="c"># solo unitarios (rápido, sin Docker)</span>
+mvn verify   <span class="c"># + integración: requiere Docker (Testcontainers levanta PostgreSQL)</span></pre>
+      <div class="tip"><strong>Relación con riesgos:</strong> en servicios críticos quieres la lógica de decisión cubierta por
+      tests unitarios veloces (como <code>DiscountEngineTest</code>) y la integración con BBDD/colas validada contra tecnología
+      real con Testcontainers, sin depender de entornos compartidos ni de un H2 que "miente".</div>
     </section>
 
     <section id="fase5">
@@ -1005,13 +1086,16 @@ curl -X POST http://localhost:8080/api/products/1/quote \
         <tr><td><code>OncePerRequestFilter</code> + MDC</td><td>2</td><td>traceId por petición (correlation id)</td></tr>
         <tr><td><code>@Configuration</code> / <code>@Bean</code></td><td>3</td><td>Wiring manual de beans (estrategias + factory)</td></tr>
         <tr><td>Inyección de <code>List&lt;T&gt;</code></td><td>3</td><td>Spring inyecta todos los beans de un tipo (Strategy)</td></tr>
+        <tr><td><code>@ExtendWith(MockitoExtension)</code> / <code>@Mock</code> / <code>@InjectMocks</code></td><td>4</td><td>Test unitario con dobles (Mockito)</td></tr>
+        <tr><td><code>@WebMvcTest</code> / <code>@MockBean</code></td><td>4</td><td>Slice de la capa web con dependencias simuladas</td></tr>
+        <tr><td><code>@DataJpaTest</code> / <code>@AutoConfigureTestDatabase</code></td><td>4</td><td>Slice de la capa JPA</td></tr>
         <tr><td><code>@Testcontainers</code> / <code>@Container</code></td><td>4</td><td>Gestiona el ciclo de vida de contenedores</td></tr>
         <tr><td><code>@ServiceConnection</code></td><td>4</td><td>Conecta Spring al contenedor automáticamente</td></tr>
       </table>
     </section>
 
     <footer>
-      <p>spring-ecommerce-lab — guía generada de forma incremental. Última fase documentada: <strong>Fase 3</strong>.</p>
+      <p>spring-ecommerce-lab — guía generada de forma incremental. Última fase documentada: <strong>Fase 4</strong>.</p>
     </footer>
   </main>
 </div>

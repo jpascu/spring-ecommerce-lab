@@ -41,7 +41,7 @@ spring-ecommerce-lab/
 - [x] **Fase 1 — CRUD (hexagonal)**: arquitectura puertos/adaptadores, JPA + H2, DTOs + MapStruct, validación, CRUD REST.
 - [x] **Fase 2 — Buenas prácticas**: manejo global de errores (`ApiError`), paginación/ordenación, logging con `traceId`.
 - [x] **Fase 3 — Patrones de diseño**: motor de descuentos con Strategy, Template Method, Factory y Builder.
-- [ ] **Fase 4 — Testing**: JUnit 5, Mockito, AssertJ, slices (`@WebMvcTest`, `@DataJpaTest`), Testcontainers.
+- [x] **Fase 4 — Testing**: pirámide de tests — Mockito (unit), `@WebMvcTest`, `@DataJpaTest` + Testcontainers (PostgreSQL real), `@SpringBootTest`.
 - [ ] **Fase 5 — Librerías Spring**: OpenAPI/Swagger, Actuator, Resilience4j, Cache, Security + JWT.
 - [ ] **Fase 6 — Async / eventos**: `@Async`, eventos de aplicación, mensajería.
 - [ ] **Fase 7 — Frontend Angular**: SPA que consume la API.
