@@ -12,7 +12,7 @@ construido de forma incremental por fases. El dominio es una pequeña tienda / c
 | Build       | Maven 3.9+                                     |
 | BBDD (dev)  | H2 en memoria                                  |
 | BBDD (test) | PostgreSQL vía Testcontainers                  |
-| Frontend    | Angular + TypeScript                           |
+| Frontend    | Angular 20 (standalone) + TypeScript           |
 | Testing     | JUnit 5, Mockito, AssertJ, Testcontainers      |
 | Extras      | Lombok, MapStruct, OpenAPI, Actuator, Resilience4j |
 
@@ -44,7 +44,7 @@ spring-ecommerce-lab/
 - [x] **Fase 4 — Testing**: pirámide de tests — Mockito (unit), `@WebMvcTest`, `@DataJpaTest` + Testcontainers (PostgreSQL real), `@SpringBootTest`.
 - [x] **Fase 5 — Librerías Spring**: OpenAPI/Swagger · Actuator + métricas (Prometheus) · Resilience4j · Cache (Caffeine) · Security + JWT.
 - [x] **Fase 6 — Async / eventos**: `@Async` con pool propio, eventos de aplicación (`ApplicationEventPublisher`) y `@TransactionalEventListener` (AFTER_COMMIT) para volcar al data lake en segundo plano.
-- [ ] **Fase 7 — Frontend Angular**: SPA que consume la API.
+- [x] **Fase 7 — Frontend Angular**: SPA Angular 20 (standalone) con login JWT (interceptor + guard), listado/CRUD de productos y presupuestos. Ver [`frontend/`](frontend/).
 - [ ] **Fase 8 — Calidad / entrega**: Docker, docker-compose, GitHub Actions CI.
 
 ## Cómo ejecutar el backend
@@ -58,6 +58,17 @@ Comprobaciones rápidas:
 
 - API ping: http://localhost:8080/api/ping
 - Health: http://localhost:8080/actuator/health
+
+## Cómo ejecutar el frontend
+
+```bash
+cd frontend
+npm install        # instala dependencias (requiere red)
+npm start          # ng serve con proxy a :8080  ->  http://localhost:4200
+```
+
+Necesita el backend en marcha. Login de ejemplo: `admin / password` (ADMIN) o `user / password` (USER).
+Más detalles en [`frontend/README.md`](frontend/README.md).
 
 ## Cómo ejecutar los tests
 

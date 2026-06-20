@@ -108,7 +108,7 @@
     <a href="#fase4">Fase 4 — Testing ✅</a>
     <a href="#fase5">Fase 5 — Librerías ✅</a>
     <a href="#fase6">Fase 6 — Async/Eventos ✅</a>
-    <a href="#fase7">Fase 7 — Angular</a>
+    <a href="#fase7">Fase 7 — Angular ✅</a>
     <a href="#fase8">Fase 8 — Calidad/CI</a>
     <div class="group">Especiales</div>
     <a href="#adaptadores">🔌 Adaptadores (más allá de HTTP/JPA)</a>
@@ -1070,8 +1070,41 @@ curl -H "Authorization: Bearer $TOKEN" localhost:8080/api/products
     </section>
 
     <section id="fase7">
-      <h2>Fase 7 — Frontend Angular <span class="badge todo">pendiente</span></h2>
-      <p>SPA Angular que consume la API REST: servicios HTTP, componentes, routing y formularios.</p>
+      <h2>Fase 7 — Frontend Angular <span class="badge done">hecho</span></h2>
+      <p>SPA en <strong>Angular 20</strong> (componentes <em>standalone</em>) que consume la API: <strong>login JWT</strong>,
+      listado y <strong>CRUD</strong> de productos y cálculo de <strong>presupuestos</strong>. Vive en <code>frontend/</code>.</p>
+
+      <h4>Piezas y responsabilidades</h4>
+      <table>
+        <tr><th>Pieza</th><th>Rol</th></tr>
+        <tr><td><code>AuthService</code></td><td>Login, guarda el JWT en <code>localStorage</code> y expone <code>username</code>/<code>roles</code>/<code>isAdmin</code> como <em>signals</em> (decodifica el payload del token).</td></tr>
+        <tr><td><code>authInterceptor</code></td><td>Interceptor funcional: añade <code>Authorization: Bearer &lt;token&gt;</code> a las llamadas y, ante un <code>401</code>, cierra sesión y redirige al login.</td></tr>
+        <tr><td><code>authGuard</code></td><td><code>CanActivateFn</code> que protege las rutas privadas (redirige a <code>/login</code> si no hay sesión).</td></tr>
+        <tr><td><code>ProductService</code></td><td>Llamadas a <code>/api/products</code> (paginado, CRUD) y <code>/quote</code>.</td></tr>
+      </table>
+
+      <h4>Configuración moderna (sin NgModules)</h4>
+      <pre><span class="c">// app.config.ts — providers a nivel de aplicación</span>
+provideRouter(routes)
+provideHttpClient(withInterceptors([authInterceptor]))   <span class="c">// interceptor funcional</span>
+
+<span class="c">// rutas con lazy loading + guard</span>
+{ path: 'products', canActivate: [authGuard],
+  loadComponent: () => import('./.../product-list.component')... }</pre>
+
+      <h4>Desarrollo sin CORS: proxy</h4>
+      <p>El dev server de Angular (<code>:4200</code>) reenvía <code>/api/*</code> al backend (<code>:8080</code>) mediante
+      <code>proxy.conf.json</code>, de modo que en desarrollo no hay que configurar CORS:</p>
+      <pre>npm start   <span class="c"># ng serve --proxy-config proxy.conf.json</span></pre>
+
+      <div class="warn"><strong>La seguridad de la UI es comodidad, no barrera:</strong> ocultar el botón "Borrar" a quien no es
+      ADMIN mejora la experiencia, pero la autorización real la impone el backend (Spring Security). Nunca confíes en el cliente
+      para autorizar.</div>
+      <div class="tip"><strong>Patrón reutilizable:</strong> el trío <em>service de auth + interceptor + guard</em> es la base de
+      cualquier frontend que consuma una API protegida con JWT; aquí lo tienes completo y mínimo.</div>
+      <div class="note"><strong>Nota:</strong> la red del entorno impidió ejecutar <code>npm install</code> durante el desarrollo,
+      así que el build no se verificó aquí. El código sigue las convenciones de Angular 20; basta <code>npm install &amp;&amp; npm start</code>
+      en una red con acceso a npm.</div>
     </section>
 
     <section id="fase8">
@@ -1397,7 +1430,7 @@ curl -H "Authorization: Bearer $TOKEN" localhost:8080/api/products
     </section>
 
     <footer>
-      <p>spring-ecommerce-lab — guía generada de forma incremental. Última fase documentada: <strong>Fase 6 (Async &amp; eventos)</strong>.</p>
+      <p>spring-ecommerce-lab — guía generada de forma incremental. Última fase documentada: <strong>Fase 7 (Frontend Angular)</strong>.</p>
     </footer>
   </main>
 </div>
