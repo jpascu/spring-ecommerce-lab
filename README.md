@@ -31,7 +31,13 @@ spring-ecommerce-lab/
 │       ├── domain/                  # núcleo: modelo y excepciones (sin frameworks)
 │       ├── application/             # puertos (in/out) y casos de uso
 │       └── infrastructure/adapter/  # adaptadores web (in) y persistencia (out)
+│       └── ...
+│   └── Dockerfile                   # imagen del backend (multi-stage)
 ├── frontend/                        # SPA Angular (Fase 7)
+│   ├── Dockerfile                   # build + nginx (Fase 8)
+│   └── nginx.conf                   # SPA fallback + proxy /api
+├── docker-compose.yml               # PostgreSQL + backend + frontend (Fase 8)
+├── .github/workflows/ci.yml         # CI: build + tests (Fase 8)
 └── docs/guia.html                   # guía de conceptos por fase
 ```
 
@@ -45,7 +51,7 @@ spring-ecommerce-lab/
 - [x] **Fase 5 — Librerías Spring**: OpenAPI/Swagger · Actuator + métricas (Prometheus) · Resilience4j · Cache (Caffeine) · Security + JWT.
 - [x] **Fase 6 — Async / eventos**: `@Async` con pool propio, eventos de aplicación (`ApplicationEventPublisher`) y `@TransactionalEventListener` (AFTER_COMMIT) para volcar al data lake en segundo plano.
 - [x] **Fase 7 — Frontend Angular**: SPA Angular 20 (standalone) con login JWT (interceptor + guard), listado/CRUD de productos y presupuestos. Ver [`frontend/`](frontend/).
-- [ ] **Fase 8 — Calidad / entrega**: Docker, docker-compose, GitHub Actions CI.
+- [x] **Fase 8 — Calidad / entrega**: Dockerfiles multi-stage (backend y frontend), `docker-compose.yml` (PostgreSQL + backend + frontend/nginx) y CI en GitHub Actions.
 
 ## Cómo ejecutar el backend
 
@@ -69,6 +75,31 @@ npm start          # ng serve con proxy a :8080  ->  http://localhost:4200
 
 Necesita el backend en marcha. Login de ejemplo: `admin / password` (ADMIN) o `user / password` (USER).
 Más detalles en [`frontend/README.md`](frontend/README.md).
+
+## Cómo ejecutar todo con Docker
+
+Levanta el stack completo (PostgreSQL + backend + frontend) con un solo comando:
+
+```bash
+docker compose up --build
+```
+
+- Frontend (nginx): http://localhost:8081
+- Backend (API + Swagger): http://localhost:8080/swagger-ui.html
+- PostgreSQL: `localhost:5432` (db `shopdb`, usuario `shop`)
+
+El backend arranca con el perfil `prod` (PostgreSQL); el frontend se sirve con nginx,
+que hace de proxy de `/api` al backend (sin CORS). Copia `.env.example` a `.env` para
+personalizar credenciales y, sobre todo, `JWT_SECRET`. Para parar: `docker compose down`
+(añade `-v` para borrar también el volumen de datos).
+
+## Integración continua (CI)
+
+El workflow [`.github/workflows/ci.yml`](.github/workflows/ci.yml) se ejecuta en cada push/PR a `main`:
+
+- **backend**: `mvn verify` (unit + integración con Testcontainers).
+- **frontend**: `npm ci` + `npm run build`.
+- **docker**: construye ambas imágenes (sin publicarlas) tras pasar los anteriores.
 
 ## Cómo ejecutar los tests
 

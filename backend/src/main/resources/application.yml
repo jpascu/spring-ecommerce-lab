@@ -74,7 +74,7 @@ info:
   app:
     name: spring-ecommerce-lab
     description: Backend de aprendizaje Spring Boot (arquitectura hexagonal)
-    phase: "Fase 5 - Librerias Spring"
+    phase: "Fase 8 - Docker & CI"
 
 # Resilience4j: tolerancia a fallos del proveedor externo de tipos de cambio
 resilience4j:

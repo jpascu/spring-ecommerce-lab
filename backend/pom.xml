@@ -151,11 +151,11 @@
       <scope>test</scope>
     </dependency>
 
-    <!-- Driver de PostgreSQL (solo en test; en runtime seguimos con H2) -->
+    <!-- Driver de PostgreSQL: runtime para el perfil 'prod' (Docker) y tambien disponible en test -->
     <dependency>
       <groupId>org.postgresql</groupId>
       <artifactId>postgresql</artifactId>
-      <scope>test</scope>
+      <scope>runtime</scope>
     </dependency>
   </dependencies>
 

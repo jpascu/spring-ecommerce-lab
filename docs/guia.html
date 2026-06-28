@@ -109,7 +109,7 @@
     <a href="#fase5">Fase 5 — Librerías ✅</a>
     <a href="#fase6">Fase 6 — Async/Eventos ✅</a>
     <a href="#fase7">Fase 7 — Angular ✅</a>
-    <a href="#fase8">Fase 8 — Calidad/CI</a>
+    <a href="#fase8">Fase 8 — Calidad/CI ✅</a>
     <div class="group">Especiales</div>
     <a href="#adaptadores">🔌 Adaptadores (más allá de HTTP/JPA)</a>
     <a href="#testcontainers">🐳 Testcontainers (deep dive)</a>
@@ -1108,8 +1108,50 @@ provideHttpClient(withInterceptors([authInterceptor]))   <span class="c">// inte
     </section>
 
     <section id="fase8">
-      <h2>Fase 8 — Calidad &amp; CI <span class="badge todo">pendiente</span></h2>
-      <p>Docker, docker-compose y GitHub Actions para integración continua.</p>
+      <h2>Fase 8 — Calidad &amp; CI <span class="badge done">hecho</span></h2>
+      <p>Empaquetamos todo para que arranque con un comando y se valide solo en cada cambio:
+      <strong>Docker</strong> (imágenes reproducibles), <strong>docker-compose</strong> (stack completo) y
+      <strong>GitHub Actions</strong> (integración continua).</p>
+
+      <h4>Imágenes Docker multi-stage</h4>
+      <p>Cada Dockerfile tiene dos etapas para que la imagen final sea pequeña y segura:</p>
+      <table>
+        <tr><th>Imagen</th><th>Etapa build</th><th>Etapa runtime</th></tr>
+        <tr><td>Backend</td><td><code>maven:3.9-temurin-21</code> → <code>mvn package</code></td><td><code>temurin-21-jre</code>, usuario no-root, healthcheck a <code>/actuator/health</code></td></tr>
+        <tr><td>Frontend</td><td><code>node:22</code> → <code>npm run build</code></td><td><code>nginx</code> sirviendo los estáticos + proxy de <code>/api</code></td></tr>
+      </table>
+      <p>Trucos clave: se copia primero <code>pom.xml</code>/<code>package*.json</code> para <strong>cachear dependencias</strong>
+      (si no cambian, Docker reutiliza la capa) y solo el artefacto final pasa a la etapa runtime, dejando fuera el JDK,
+      Maven y el código fuente.</p>
+
+      <h4>docker-compose: el stack completo</h4>
+      <pre>docker compose up --build
+<span class="c"># Frontend (nginx)  -> http://localhost:8081</span>
+<span class="c"># Backend (API)     -> http://localhost:8080/swagger-ui.html</span>
+<span class="c"># PostgreSQL        -> localhost:5432</span></pre>
+      <p>Tres servicios: <code>postgres</code>, <code>backend</code> (perfil <code>prod</code>, conecta a Postgres por variables de
+      entorno) y <code>frontend</code> (nginx). El backend usa <code>depends_on: condition: service_healthy</code> para arrancar
+      <strong>después</strong> de que Postgres pase su <em>healthcheck</em> (<code>pg_isready</code>), evitando errores de conexión al inicio.</p>
+
+      <h4>Perfil <code>prod</code> y configuración por entorno</h4>
+      <p>En dev usábamos H2 + <code>create-drop</code>; el perfil <code>prod</code> (<code>application-prod.yml</code>) apunta a PostgreSQL,
+      usa <code>ddl-auto: update</code> y exige <code>JWT_SECRET</code> por variable de entorno. El driver de PostgreSQL pasó a
+      <em>scope</em> <code>runtime</code> para que viaje en el jar.</p>
+
+      <h4>Integración continua (GitHub Actions)</h4>
+      <pre><span class="c"># .github/workflows/ci.yml — en cada push/PR a main</span>
+backend  : setup-java 21 + cache maven  -> mvn verify   <span class="c"># unit + IT (Testcontainers)</span>
+frontend : setup-node 22 + cache npm    -> npm ci && npm run build
+docker   : build de ambas imagenes (sin publicar)        <span class="c"># solo si pasan los anteriores</span></pre>
+      <p>Los <em>IT</em> con Testcontainers funcionan en el runner porque GitHub ya trae Docker. Así, cada cambio se compila y
+      testea automáticamente antes de integrarse.</p>
+
+      <div class="tip"><strong>Reproducibilidad:</strong> "en mi máquina funciona" deja de ser un problema cuando el entorno
+      (JDK, BBDD, servidor web) viaja dentro de imágenes versionadas. Compose levanta ese entorno idéntico en local o en un servidor.</div>
+      <div class="warn"><strong>Secretos fuera del repo:</strong> <code>JWT_SECRET</code> y las credenciales de BBDD se inyectan por
+      entorno (<code>.env</code>, ignorado por git; hay un <code>.env.example</code> de plantilla). Nunca se hornean en la imagen ni se commitean.</div>
+      <div class="note"><strong>Validado aquí:</strong> el backend empaqueta (<code>mvn package</code>) y <code>docker compose config</code>
+      es válido. El build de imágenes y el <code>npm ci</code> dependen de red con acceso a Docker Hub / npm.</div>
     </section>
 
     <!-- ============================ ADAPTADORES ============================ -->
@@ -1430,7 +1472,7 @@ provideHttpClient(withInterceptors([authInterceptor]))   <span class="c">// inte
     </section>
 
     <footer>
-      <p>spring-ecommerce-lab — guía generada de forma incremental. Última fase documentada: <strong>Fase 7 (Frontend Angular)</strong>.</p>
+      <p>spring-ecommerce-lab — guía generada de forma incremental. Última fase documentada: <strong>Fase 8 (Docker &amp; CI)</strong>. ¡Proyecto completo!</p>
     </footer>
   </main>
 </div>

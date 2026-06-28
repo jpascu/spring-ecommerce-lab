@@ -1,0 +1,52 @@
+# Stack completo del lab: PostgreSQL + backend Spring Boot + frontend Angular (nginx).
+#
+# Uso:
+#   docker compose up --build
+#   Frontend:  http://localhost:8081
+#   Backend:   http://localhost:8080  (Swagger en /swagger-ui.html)
+#
+# Los valores sensibles tienen defaults de desarrollo; sobreescribelos con un
+# fichero .env o variables de entorno en un despliegue real (sobre todo JWT_SECRET).
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-shopdb}
+      POSTGRES_USER: ${POSTGRES_USER:-shop}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-shop}
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-shop} -d ${POSTGRES_DB:-shopdb}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-shopdb}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-shop}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-shop}
+      JWT_SECRET: ${JWT_SECRET:-cambia-este-secreto-de-desarrollo-no-usar-en-produccion-1234}
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: ./frontend
+    ports:
+      - "8081:80"
+    depends_on:
+      - backend
+
+volumes:
+  pgdata:

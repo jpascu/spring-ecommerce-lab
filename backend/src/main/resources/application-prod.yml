@@ -1,0 +1,35 @@
+# Perfil 'prod': pensado para ejecutarse en contenedor contra PostgreSQL.
+# Se activa con SPRING_PROFILES_ACTIVE=prod (ver docker-compose.yml).
+# Todos los valores sensibles/entorno se inyectan por variables de entorno.
+spring:
+  datasource:
+    # Por defecto apunta al servicio 'postgres' del docker-compose.
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://postgres:5432/shopdb}
+    username: ${SPRING_DATASOURCE_USERNAME:shop}
+    password: ${SPRING_DATASOURCE_PASSWORD:shop}
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    hibernate:
+      # 'update' mantiene el esquema entre reinicios (en dev usabamos create-drop con H2).
+      # En un entorno real serio se preferiria Flyway/Liquibase; aqui basta para el lab.
+      ddl-auto: update
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: false
+
+  # En prod no exponemos la consola H2.
+  h2:
+    console:
+      enabled: false
+
+# El secreto del JWT debe venir SIEMPRE por entorno en prod.
+security:
+  jwt:
+    secret: ${JWT_SECRET}
+
+info:
+  app:
+    phase: "Fase 8 - Docker & CI"
